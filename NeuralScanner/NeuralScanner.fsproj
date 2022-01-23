@@ -93,7 +93,7 @@
     <None Include="Info.plist" />
     <None Include="Entitlements.plist" />
     <InterfaceDefinition Include="Main.storyboard" />
-    <Compile Include="ViewController.fs" />
+    <Compile Include="CaptureViewController.fs" />
     <Compile Include="AppDelegate.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
