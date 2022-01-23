@@ -38,5 +38,7 @@
 	<string>Assets.xcassets/AppIcon.appiconset</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera is used to capture 3D geometry</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 </dict>
 </plist>
