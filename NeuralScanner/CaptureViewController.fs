@@ -15,6 +15,7 @@ type CaptureViewController () =
         let b = UIButton.FromType UIButtonType.RoundedRect
         b.SetTitle("Capture", UIControlState.Normal)
         b
+    let posLabel = new UILabel ()
     let sceneView = new ARSCNView()
 
     let depthSemantics = ARFrameSemantics.SceneDepth
@@ -94,6 +95,14 @@ type CaptureViewController () =
         captureButton.TouchUpInside.Add (fun _ ->
             needsCapture <- true)
         this.View.AddSubview captureButton
+
+        posLabel.Frame <- CGRect(nfloat 0.0, captureButton.Frame.Top - buttonHeight, bounds.Width, buttonHeight)
+        posLabel.AutoresizingMask <- UIViewAutoresizing.FlexibleWidth ||| UIViewAutoresizing.FlexibleTopMargin
+        posLabel.BackgroundColor <- UIColor.SystemBackgroundColor.ColorWithAlpha(nfloat 0.1)
+        posLabel.TextAlignment <- UITextAlignment.Center
+        posLabel.Text <- "(0.000, 0.000, 0.000)"
+        posLabel.Font <- UIFont.SystemFontOfSize (nfloat 0.75 * buttonHeight)
+        this.View.AddSubview posLabel
         
         match sceneView.Session with
         | null -> printfn "NO ARKIT"
@@ -108,6 +117,12 @@ type CaptureViewController () =
     [<Export("session:didUpdateFrame:")>]
     member this.DidUpdateFrame (session : ARSession, frame : ARFrame) =
         use frame = frame
+        let cameraTransform = frame.Camera.Transform
+        let cameraPosition = cameraTransform.Column3.Xyz
+        let posString = sprintf "(%.3f, %.3f, %.3f)" cameraPosition.X cameraPosition.Y cameraPosition.Z
+        this.BeginInvokeOnMainThread (fun () ->
+            posLabel.Text <- posString
+            ())
         if needsCapture then
             needsCapture <- false
             numCapturedFrames <- numCapturedFrames + 1
@@ -116,20 +131,19 @@ type CaptureViewController () =
             use sceneDepth = frame.SceneDepth
             let cameraIntrinsics = frame.Camera.Intrinsics
             let cameraProjection = frame.Camera.ProjectionMatrix
-            let cameraTransform = frame.Camera.Transform
             printfn "COLOR      %A" (capturedImage)
             printfn "DEPTH      %A" sceneDepth
             printfn "INTRINSICS %A" cameraIntrinsics
             printfn "PROJECTION %A" cameraProjection
             printfn "TRANSFORM  %A" cameraTransform
-            outputPixelBuffer framePrefix "SceneDepth" sceneDepth.DepthMap
-            outputPixelBuffer framePrefix "SceneDepthConfidence" sceneDepth.ConfidenceMap
+            printfn "POSITION   %A" cameraPosition
+            outputPixelBuffer framePrefix "Depth" sceneDepth.DepthMap
+            outputPixelBuffer framePrefix "DepthConfidence" sceneDepth.ConfidenceMap
             outputPixelBuffer framePrefix "Image" capturedImage
-            outputNMatrix4 framePrefix "CameraProjection" cameraProjection
-            outputNMatrix4 framePrefix "CameraTransform" cameraTransform
-            outputNMatrix3 framePrefix "CameraIntrinsics" cameraIntrinsics
-        ()
-
+            outputSize framePrefix "Resolution" cameraResolution
+            outputNMatrix4 framePrefix "Projection" cameraProjection
+            outputNMatrix4 framePrefix "Transform" cameraTransform
+            outputNMatrix3 framePrefix "Intrinsics" cameraIntrinsics
 
 
 and CaptureViewDelegate () =
