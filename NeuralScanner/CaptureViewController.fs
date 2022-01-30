@@ -31,12 +31,14 @@ type CaptureViewController () =
     let outputPixelBuffer (prefix : string) (name : string) (buffer : CoreVideo.CVPixelBuffer) =
         match buffer.PixelFormatType with
         | CoreVideo.CVPixelFormatType.CV420YpCbCr8BiPlanarFullRange ->
-            let path = IO.Path.Combine(outputDir, sprintf "%s_%s.png" prefix name)
+            let path = IO.Path.Combine(outputDir, sprintf "%s_%s.jpg" prefix name)
             let image = CoreImage.CIImage.FromImageBuffer(buffer)
-            let uiimage = UIImage.FromImage(image)
-            uiimage.AsPNG().Save(path, true) |> ignore
+            use uiimage = UIImage.FromImage(image, UIScreen.MainScreen.Scale, UIImageOrientation.Up)
+            let scale = uiimage.CurrentScale
+            printfn "SCALE = %A" scale
+            uiimage.AsJPEG().Save(path, true) |> ignore
         | _ ->
-            let path = IO.Path.Combine(outputDir, sprintf "%s_%s.pixels" prefix name)
+            let path = IO.Path.Combine(outputDir, sprintf "%s_%s.pixelbuffer" prefix name)
             use w = IO.File.OpenWrite (path)
             use bw = new IO.BinaryWriter (w)
             let width = buffer.Width
@@ -58,21 +60,29 @@ type CaptureViewController () =
             bw.Write (array)
         ()
 
+    let writeVector4 (w : IO.TextWriter) (name : string) (v : OpenTK.Vector4) =
+        w.WriteLine(String.Format(System.Globalization.CultureInfo.InvariantCulture, "{0} {1:0.000000000} {2:0.000000000} {3:0.000000000} {4:0.000000000}", name, v.X, v.Y, v.Z, v.W))
+
     let outputNMatrix4 (prefix : string) (name : string) (matrix : OpenTK.NMatrix4) =
         let path = IO.Path.Combine(outputDir, sprintf "%s_%s.txt" prefix name)
         use w = new IO.StreamWriter (path)
-        w.WriteLine("Row0 {0}", matrix.Row0)
-        w.WriteLine("Row1 {0}", matrix.Row1)
-        w.WriteLine("Row2 {0}", matrix.Row2)
-        w.WriteLine("Row3 {0}", matrix.Row3)
+        writeVector4 w "Row0" matrix.Row0
+        writeVector4 w "Row1" matrix.Row1
+        writeVector4 w "Row2" matrix.Row2
+        writeVector4 w "Row3" matrix.Row3
 
     let outputNMatrix3 (prefix : string) (name : string) (matrix : OpenTK.NMatrix3) =
         let path = IO.Path.Combine(outputDir, sprintf "%s_%s.txt" prefix name)
         use w = new IO.StreamWriter (path)
-        w.WriteLine("Row0 {0}", OpenTK.Vector4(matrix.R0C0, matrix.R0C1, matrix.R0C2, 0f))
-        w.WriteLine("Row1 {0}", OpenTK.Vector4(matrix.R1C0, matrix.R1C1, matrix.R1C2, 0f))
-        w.WriteLine("Row3 {0}", OpenTK.Vector4(matrix.R2C0, matrix.R2C1, matrix.R2C2, 0f))
-        w.WriteLine("Row4 {0}", OpenTK.Vector4.UnitW)
+        writeVector4 w "Row0" (OpenTK.Vector4(matrix.R0C0, matrix.R0C1, matrix.R0C2, 0f))
+        writeVector4 w "Row1" (OpenTK.Vector4(matrix.R1C0, matrix.R1C1, matrix.R1C2, 0f))
+        writeVector4 w "Row2" (OpenTK.Vector4(matrix.R2C0, matrix.R2C1, matrix.R2C2, 0f))
+        writeVector4 w "Row3" OpenTK.Vector4.UnitW
+
+    let outputSize (prefix : string) (name : string) (size : CGSize) =
+        let path = IO.Path.Combine(outputDir, sprintf "%s_%s.txt" prefix name)
+        use w = new IO.StreamWriter (path)
+        w.WriteLine(String.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.000000000} {1:0.000000000}", size.Width, size.Height))
 
     do
         base.Title <- "Capture"
@@ -129,6 +139,7 @@ type CaptureViewController () =
             let framePrefix = sprintf "Frame%d" numCapturedFrames
             use capturedImage = frame.CapturedImage
             use sceneDepth = frame.SceneDepth
+            let cameraResolution = frame.Camera.ImageResolution
             let cameraIntrinsics = frame.Camera.Intrinsics
             let cameraProjection = frame.Camera.ProjectionMatrix
             printfn "COLOR      %A" (capturedImage)
