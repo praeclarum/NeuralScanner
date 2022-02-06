@@ -14,13 +14,15 @@ type AppDelegate() =
     override this.FinishedLaunching(_, _) =
         this.Window <- new UIWindow(UIScreen.MainScreen.Bounds)
 
-        let vc = new UIViewController(Title = "Home")
+        let homeVC = new UIViewController(Title = "Home")
+        let renderVC = new RenderViewController(Title = "Render")
         let captureVC = new CaptureViewController()
 
         let tabs = new UITabBarController ()
         let tabVCs : UIViewController[] =
             [|
-                //new UINavigationController (vc)
+                //new UINavigationController (homeVC)
+                new UINavigationController (renderVC)
                 new UINavigationController (captureVC)
             |]
         tabs.SetViewControllers (tabVCs, false)

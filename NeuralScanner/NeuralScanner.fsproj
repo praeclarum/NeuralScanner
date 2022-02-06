@@ -82,6 +82,9 @@
     <Reference Include="System.Numerics" />
     <Reference Include="mscorlib" />
     <Reference Include="Xamarin.iOS" />
+    <Reference Include="SdfKit">
+      <HintPath>..\packages\SdfKit.0.2.13\lib\netstandard2.1\SdfKit.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Resources\" />
@@ -93,9 +96,12 @@
     <None Include="Info.plist" />
     <None Include="Entitlements.plist" />
     <InterfaceDefinition Include="Main.storyboard" />
+    <Compile Include="RenderViewController.fs" />
     <Compile Include="CaptureViewController.fs" />
     <Compile Include="AppDelegate.fs" />
     <Compile Include="Main.fs" />
+    <BundleResource Include="Resources\SDF.mlmodel" />
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.iOS.FSharp.targets" />
 </Project>
