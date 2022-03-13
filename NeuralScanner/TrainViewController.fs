@@ -28,8 +28,8 @@ type TrainViewController () =
         trainer.BatchTrained.Add (fun (progress, totalTrained, loss) ->
             graph.AddLoss (progress, loss))
 
-        System.Threading.ThreadPool.QueueUserWorkItem(fun _ -> trainer.GenerateMesh ()) |> ignore
-        //System.Threading.ThreadPool.QueueUserWorkItem(fun _ -> trainer.Train ()) |> ignore
+        System.Threading.ThreadPool.QueueUserWorkItem(fun _ -> trainer.Train ()) |> ignore
+        //System.Threading.ThreadPool.QueueUserWorkItem(fun _ -> trainer.GenerateMesh ()) |> ignore
 
 
 and LossGraphView () =
