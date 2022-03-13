@@ -17,10 +17,12 @@ type AppDelegate() =
         let homeVC = new UIViewController(Title = "Home")
         let renderVC = new RenderViewController(Title = "Render")
         let captureVC = new CaptureViewController()
+        let trainVC = new TrainViewController()
 
         let tabs = new UITabBarController ()
         let tabVCs : UIViewController[] =
             [|
+                new UINavigationController (trainVC)
                 //new UINavigationController (homeVC)
                 new UINavigationController (renderVC)
                 new UINavigationController (captureVC)

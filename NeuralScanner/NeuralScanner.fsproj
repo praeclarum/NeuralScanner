@@ -96,12 +96,21 @@
     <None Include="Info.plist" />
     <None Include="Entitlements.plist" />
     <InterfaceDefinition Include="Main.storyboard" />
+    <Compile Include="Tensors.fs" />
+    <Compile Include="TrainViewController.fs" />
     <Compile Include="RenderViewController.fs" />
     <Compile Include="CaptureViewController.fs" />
     <Compile Include="AppDelegate.fs" />
     <Compile Include="Main.fs" />
     <BundleResource Include="Resources\SDF.mlmodel" />
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\MetalTensors\MetalTensors.iOS\MetalTensors.iOS.csproj">
+      <Project>{06BAB14A-A97E-44D4-BABC-ED0EBB5771AD}</Project>
+      <Name>MetalTensors.iOS</Name>
+      <ReferenceSourceTarget>ProjectReference</ReferenceSourceTarget>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.iOS.FSharp.targets" />
 </Project>

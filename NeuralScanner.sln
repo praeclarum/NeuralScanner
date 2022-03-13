@@ -5,6 +5,10 @@ VisualStudioVersion = 25.0.1700.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "NeuralScanner", "NeuralScanner\NeuralScanner.fsproj", "{A7843149-6E94-4CD3-90FC-3457F44C13B8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MetalTensors.iOS", "..\MetalTensors\MetalTensors.iOS\MetalTensors.iOS.csproj", "{06BAB14A-A97E-44D4-BABC-ED0EBB5771AD}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "MetalTensors", "..\MetalTensors\MetalTensors\MetalTensors.shproj", "{7EC97FDC-55FB-4B35-9271-713973E659E2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|iPhoneSimulator = Debug|iPhoneSimulator
@@ -21,6 +25,14 @@ Global
 		{A7843149-6E94-4CD3-90FC-3457F44C13B8}.Release|iPhoneSimulator.Build.0 = Release|iPhoneSimulator
 		{A7843149-6E94-4CD3-90FC-3457F44C13B8}.Debug|iPhone.ActiveCfg = Debug|iPhone
 		{A7843149-6E94-4CD3-90FC-3457F44C13B8}.Debug|iPhone.Build.0 = Debug|iPhone
+		{06BAB14A-A97E-44D4-BABC-ED0EBB5771AD}.Debug|iPhoneSimulator.ActiveCfg = Debug|Any CPU
+		{06BAB14A-A97E-44D4-BABC-ED0EBB5771AD}.Debug|iPhoneSimulator.Build.0 = Debug|Any CPU
+		{06BAB14A-A97E-44D4-BABC-ED0EBB5771AD}.Release|iPhone.ActiveCfg = Release|Any CPU
+		{06BAB14A-A97E-44D4-BABC-ED0EBB5771AD}.Release|iPhone.Build.0 = Release|Any CPU
+		{06BAB14A-A97E-44D4-BABC-ED0EBB5771AD}.Release|iPhoneSimulator.ActiveCfg = Release|Any CPU
+		{06BAB14A-A97E-44D4-BABC-ED0EBB5771AD}.Release|iPhoneSimulator.Build.0 = Release|Any CPU
+		{06BAB14A-A97E-44D4-BABC-ED0EBB5771AD}.Debug|iPhone.ActiveCfg = Debug|Any CPU
+		{06BAB14A-A97E-44D4-BABC-ED0EBB5771AD}.Debug|iPhone.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
