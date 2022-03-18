@@ -8,8 +8,16 @@ open System.Globalization
 
 open MetalTensors
 
-type SdfFrame (depthPath : string, dataDirectory : string) =
-    let samplingDistance = 1.0e-3f
+[<AutoOpen>]
+module MathOps =
+    let randn () =
+        let u1 = StaticRandom.NextDouble ()
+        let u2 = StaticRandom.NextDouble ()
+        float32 (Math.Sqrt(-2.0 * Math.Log (u1)) * Math.Cos(2.0 * Math.PI * u2))
+
+
+
+type SdfFrame (depthPath : string, dataDirectory : string, samplingDistance : float32, outputScale : float32) =
 
     let width, height, depths =
         let f = File.OpenRead (depthPath)
@@ -97,75 +105,90 @@ type SdfFrame (depthPath : string, dataDirectory : string) =
         let testResult = Vector4.Transform(Vector4.UnitW, transform)
         Vector4.Transform(camPos, transform)
 
+    let centerPos = worldPosition (width/2) (height/2) 0.0f
+
+    do printfn "%s CENTER = %g, %g, %g" depthPath centerPos.X centerPos.Y centerPos.Z
+
     let vector3Shape = [| 3 |]
     let freespaceShape = [| 1 |]
     let distanceShape = [| 1 |]
 
-    member this.PointCount = pointCount
+    let mutable inboundIndices = [||]
 
-    member this.GetRow (random : Random, inside: bool) : struct (Tensor[]*Tensor[]) =
-        // Find a medium to high confidence pixel to sample
-        let mutable x = random.Next(width)
-        let mutable y = random.Next(height)
-        let maxTries = 100
-        let mutable t = 0
-        while t < maxTries && confidences.[index x y] <= 0uy do
-            x <- random.Next(width)
-            y <- random.Next(height)
-            t <- t + 1
+    member this.FindInBoundPoints (min : Vector3, max : Vector3) =
+        let inbounds = ResizeArray<_>()
+        for x in 0..(width-1) do
+            for y in 0..(height-1) do
+                let i = index x y
+                if confidences.[i] > 0uy then
+                    let p = worldPosition x y 0.001f
+                    if p.X >= min.X && p.Y >= min.Y && p.Z >= min.Z &&
+                       p.X <= max.X && p.Y <= max.Y && p.Z <= max.Z then
+                        inbounds.Add(i)
+        inboundIndices <- inbounds.ToArray ()
+
+    member this.PointCount = inboundIndices.Length
+
+    member this.GetRow (inside: bool, poi : Vector3) : struct (Tensor[]*Tensor[]) =
+        // i = y * width + x
+        let i = inboundIndices.[StaticRandom.Next(inboundIndices.Length)]
+        let x = i % width
+        let y = i / width
 
         // Half the time inside, half outside
-        if inside then
-            let depthOffset = float32 (random.NextDouble()) * samplingDistance
-            let pos = worldPosition x y depthOffset
-            let inputs = [| Tensor.Array(vector3Shape, pos.X, pos.Y, pos.Z)
-                            Tensor.Array(freespaceShape, 0.0f)
-                            Tensor.Array(distanceShape, -depthOffset) |]
-            struct (inputs, [| |])
-        else
-            // Outside
-            if random.Next(2) = 0 then
-                // Surface
-                let depthOffset = -float32 (random.NextDouble()) * samplingDistance
-                let pos = worldPosition x y depthOffset
-                let inputs = [| Tensor.Array(vector3Shape, pos.X, pos.Y, pos.Z)
-                                Tensor.Array(freespaceShape, 0.0f)
-                                Tensor.Array(distanceShape, -depthOffset) |]
-                struct (inputs, [| |])
+        let depthOffset, free =
+            if inside then
+                abs (randn () * samplingDistance), 0.0f
             else
-                // Freespace
-                let depthOffset = -float32 (random.NextDouble()) * depths.[index x y]
-                let pos = worldPosition x y depthOffset
-                let inputs = [| Tensor.Array(vector3Shape, pos.X, pos.Y, pos.Z)
-                                Tensor.Array(freespaceShape, 1.0f)
-                                Tensor.Array(distanceShape, -depthOffset) |]
-                struct (inputs, [| |])
+                // Outside
+                if StaticRandom.Next(2) = 0 then
+                    // Surface
+                    -abs (randn () * samplingDistance), 0.0f
+                else
+                    // Freespace
+                    let depth = depths.[index x y]
+                    float32 (-StaticRandom.NextDouble()) * depth, 1.0f
+        let pos = worldPosition x y depthOffset - Vector4(poi, 1.0f)
+        let outputSignedDistance = -depthOffset * outputScale
+        //let outputSignedDistance = 0.05f
+        let inputs = [| Tensor.Array(vector3Shape, pos.X, pos.Y, pos.Z)
+                        Tensor.Array(freespaceShape, free)
+                        Tensor.Array(distanceShape, outputSignedDistance) |]
+        struct (inputs, [| |])
 
-type SdfDataSet (dataDirectory : string) =
+type SdfDataSet (dataDirectory : string, samplingDistance : float32, outputScale : float32) =
     inherit DataSet ()
 
     let depthFiles = Directory.GetFiles (dataDirectory, "*_Depth.pixelbuffer")
 
     let frames =
         depthFiles
-        |> Array.map (fun x -> SdfFrame (x, dataDirectory))
+        |> Array.map (fun x -> SdfFrame (x, dataDirectory, samplingDistance, outputScale))
     let count = depthFiles |> Seq.sumBy (fun x -> 1)
     do if count = 0 then failwithf "No files in %s" dataDirectory
 
-    let random = new System.Random ()
+    let volumeMin = Vector3 (-0.30533359f, -1.12338264f, -0.89218203f)
+    let volumeMax = Vector3 (0.69466641f, -0.62338264f, 0.10781797f)
+    let poi = (volumeMin + volumeMax) * 0.5f
 
-    let mutable nextIsInside = false
+    do for f in frames do f.FindInBoundPoints(volumeMin, volumeMax)
+
+    member this.VolumeMin = volumeMin
+    member this.VolumeMax = volumeMax
+    member this.VolumeCenter = poi
 
     override this.Count = frames |> Array.sumBy (fun x -> x.PointCount)
 
-    override this.GetRow (_, _) =
-        let fi = random.Next(frames.Length)
-        let r = frames.[fi].GetRow (random, nextIsInside)
-        nextIsInside <- not nextIsInside
-        r
-
+    override this.GetRow (index, _) =
+        let inside = (index % 2) = 0
+        let fi = StaticRandom.Next(frames.Length)
+        let struct (i, o) = frames.[fi].GetRow (inside, poi)
+        //printfn "ROW%A D%A = %A" index inside i.[2].[0]
+        struct (i, o)
 
 type Trainer () =
+
+    let outputScale = 1.0f
 
     let networkDepth = 8
     let networkWidth = 512
@@ -173,29 +196,35 @@ type Trainer () =
 
     let learningRate = 1.0e-5f
 
+    let samplingDistance = 1.0e-3f
+
+    let lossClipDelta = 1.0e-2f * outputScale
+    //let lossClipDelta = 0.4f
+
+    let batchSize = 1024
+
     let batchTrained = Event<_> ()
 
-    let volumeMin = Vector3 (-0.30533359f, -1.12338264f, -0.89218203f)
-    let volumeMax = Vector3 (0.69466641f, -0.62338264f, 0.10781797f)
+    let weightsInit = WeightsInit.Default//.GlorotUniform (0.54f) //.Uniform (-0.02f, 0.02f)
 
     let createSdfModel () =
         let input = Tensor.Input("xyz", 3)
-        let hiddenLayer (x : Tensor) =
-            x.Dense(networkWidth).ReLU().Dropout(dropoutRate)
+        let hiddenLayer (x : Tensor) (i : int) (drop : bool) =
+            let r = x.Dense(networkWidth, weightsInit=weightsInit, name=sprintf "hidden%d" i).ReLU(sprintf "relu%d" i)
+            if false && drop then r.Dropout(dropoutRate, name=sprintf "drop%d" i) else r
         let houtput1 =
-            (seq{1..(networkDepth/2)}
-             |> Seq.fold (fun a _ -> hiddenLayer a) input)
-        let inner = input.Dense(networkWidth).ReLU().Concat(houtput1)
+            (seq{0..(networkDepth/2-1)}
+             |> Seq.fold (fun a i -> hiddenLayer a i true) input)
+        let inner = houtput1.Concat(input, name="skip")
         let houtput =
-            (seq{1..(networkDepth/2)}
-             |> Seq.fold (fun a _ -> hiddenLayer a) inner)
-        let output = houtput.Dense(networkWidth).ReLU().Dense(1).Tanh()
+            (seq{networkDepth/2..(networkDepth-1)}
+             |> Seq.fold (fun a i -> hiddenLayer a i (i + 1 < networkDepth)) inner)
+        let output = houtput.Dense(1, weightsInit=weightsInit, name="raw_distance").Tanh ("distance")
         let model = Model (input, output, "SDF")
         //let r = model.Compile (Loss.MeanAbsoluteError,
         //                       new AdamOptimizer(learningRate))
+        printfn "%s" model.Summary
         model
-
-    let lossClipDelta = 1.0e-2f
 
     let createTrainingModel (sdfModel : Model) : Model =
         let inputXyz = Tensor.Input("xyz", 3)
@@ -206,21 +235,20 @@ type Trainer () =
 
         let clipOutput = output.Clip(-lossClipDelta, lossClipDelta)
         let clipExpected = inputExpected.Clip(-lossClipDelta, lossClipDelta)
-        let surfaceLoss = (clipOutput - clipExpected).Abs().SpatialMean()
 
-        let freespaceLoss = (0.0f - output).Clip(0.0f, lossClipDelta).SpatialMean()
+        let surfaceLoss = clipOutput.Loss(clipExpected, Loss.MeanAbsoluteError)
 
-        let totalLoss =
-            surfaceLoss * (1.0f - inputFreespace) +
-            freespaceLoss * inputFreespace
+        let freespaceLoss = (0.0f - output).Clip(0.0f, lossClipDelta).Loss(Tensor.Constant(0.0f, 1), Loss.MeanAbsoluteError)
+
+        let totalLoss = surfaceLoss * (1.0f - inputFreespace) //+ freespaceLoss * inputFreespace
 
         model.AddLoss (totalLoss)
-        let r = model.Compile (new AdamOptimizer(learningRate))
+        let r = model.Compile (new AdamOptimizer (learningRate))
+        printfn "%s" model.Summary
         model
 
-    let dataDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
-
-    let batchSize = 1024
+    let dataDir = Environment.GetFolderPath (Environment.SpecialFolder.MyDocuments)
+    let data = SdfDataSet (dataDir, samplingDistance, outputScale)
 
     let modelPath = dataDir + "/Onewheel.zip"
 
@@ -236,15 +264,17 @@ type Trainer () =
 
     let trainingModel = createTrainingModel model
 
+    let mutable trainedPoints = 0
+
     member this.BatchTrained = batchTrained.Publish
 
     member this.Train () =
         //let data = SdfDataSet ("/Users/fak/Data/NeuralScanner/Onewheel")
-        let data = SdfDataSet (dataDir)
-        let struct(inputs, outputs) = data.GetRow(0, null)
+        //let struct(inputs, outputs) = data.GetRow(0, null)
         printfn "%O" trainingModel
+        //this.GenerateMesh ()
         let mutable totalTrained = 0
-        let epochs = 1.0f
+        let epochs = 1.125f
         let callback (h : TrainingHistory.BatchHistory) =
             //printfn "LOSS %g" h.AverageLoss
             totalTrained <- batchSize + totalTrained
@@ -252,6 +282,7 @@ type Trainer () =
             batchTrained.Trigger (progress, totalTrained, h.AverageLoss)
             ()
         let history = trainingModel.Fit(data, batchSize = batchSize, epochs = epochs, callback = fun h -> callback h)
+        trainedPoints <- trainedPoints + int (epochs * float32 data.Count)
         this.GenerateMesh ()
         ()
 
@@ -268,21 +299,24 @@ type Trainer () =
         let sdf (x : Memory<Vector3>) (y : Memory<Vector4>) =
             let batchTensors = Array.init x.Length (fun i ->
                 let x = x.Span
-                let input = Tensor.Array(x.[i].X, x.[i].Y, x.[i].Z)
+                let p = x.[i] - data.VolumeCenter
+                let input = Tensor.Array(p.X, p.Y, p.Z)
                 [|input|])
             let results = model.Predict(batchTensors)
             let y = y.Span
             for i in 0..(x.Length-1) do
                 let r = results.[i].[0]
                 let yvec = Vector4(1.0f, 1.0f, 1.0f, r.[0])
+                if numPoints < totalPoints / 100 then
+                    printfn "%g" yvec.W
                 y.[i] <- yvec
             numPoints <- numPoints + y.Length
             let progress = float numPoints / float totalPoints
             printfn "NN Sample Progress: %.1f" (progress * 100.0)
 
-        let voxels = SdfKit.Voxels.SampleSdf (sdf, volumeMin, volumeMax, nx, ny, nz, batchSize = batchSize, maxDegreeOfParallelism = 2)
+        let voxels = SdfKit.Voxels.SampleSdf (sdf, data.VolumeMin, data.VolumeMax, nx, ny, nz, batchSize = batchSize, maxDegreeOfParallelism = 2)
         let mesh = SdfKit.MarchingCubes.CreateMesh (voxels, 0.0f, step = 1)
-        mesh.WriteObj (dataDir + "/OnewheelBetter.obj")
+        mesh.WriteObj (dataDir + sprintf "/Onewheel%d.obj" trainedPoints)
         ()
 
 

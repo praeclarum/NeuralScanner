@@ -59,7 +59,7 @@ and LossGraphView () =
             let bounds = this.Bounds
 
             let dxdi = bounds.Width / nfloat (float (losses.Count - 1))
-            let dydl = bounds.Height / nfloat 0.1
+            let dydl = bounds.Height / nfloat 0.03
 
             UIColor.SystemYellow.SetFill ()
             let c = UIGraphics.GetCurrentContext ()
