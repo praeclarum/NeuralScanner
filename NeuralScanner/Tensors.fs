@@ -102,7 +102,7 @@ type SdfFrame (depthPath : string, dataDirectory : string, samplingDistance : fl
         let camPos = cameraPosition x y depthOffset
         // World = Transform * Camera
         // World = Camera * Transform'
-        let testResult = Vector4.Transform(Vector4.UnitW, transform)
+        //let testResult = Vector4.Transform(Vector4.UnitW, transform)
         Vector4.Transform(camPos, transform)
 
     let centerPos = worldPosition (width/2) (height/2) 0.0f
@@ -131,9 +131,9 @@ type SdfFrame (depthPath : string, dataDirectory : string, samplingDistance : fl
 
     member this.GetRow (inside: bool, poi : Vector3) : struct (Tensor[]*Tensor[]) =
         // i = y * width + x
-        let i = inboundIndices.[StaticRandom.Next(inboundIndices.Length)]
-        let x = i % width
-        let y = i / width
+        let index = inboundIndices.[StaticRandom.Next(inboundIndices.Length)]
+        let x = index % width
+        let y = index / width
 
         // Half the time inside, half outside
         let depthOffset, free =
@@ -146,8 +146,9 @@ type SdfFrame (depthPath : string, dataDirectory : string, samplingDistance : fl
                     -abs (randn () * samplingDistance), 0.0f
                 else
                     // Freespace
-                    let depth = depths.[index x y]
+                    let depth = depths.[index]
                     float32 (-StaticRandom.NextDouble()) * depth, 1.0f
+
         let pos = worldPosition x y depthOffset - Vector4(poi, 1.0f)
         let outputSignedDistance = -depthOffset * outputScale
         let inputs = [| Tensor.Array(vector3Shape, pos.X, pos.Y, pos.Z)
@@ -187,19 +188,17 @@ type SdfDataSet (dataDirectory : string, samplingDistance : float32, outputScale
 
 type Trainer () =
 
+    // Hyperparameters
     let outputScale = 50.0f
-
+    let samplingDistance = 1.0e-3f
+    let lossClipDelta = 1.0e-2f * outputScale
+    let learningRate = 5.0e-5f
     let networkDepth = 8
     let networkWidth = 512
+    let batchSize = 1024
     //let dropoutRate = 0.2f
 
-    let learningRate = 5.0e-5f
-
-    let samplingDistance = 1.0e-3f
-
-    let lossClipDelta = 1.0e-2f * outputScale
-
-    let batchSize = 1024
+    // Derived parameters
 
     let batchTrained = Event<_> ()
 
@@ -273,16 +272,17 @@ type Trainer () =
         printfn "%O" trainingModel
         //this.GenerateMesh ()
         let mutable totalTrained = 0
-        let epochs = 2.0f
+        let numEpochs = 10
         let callback (h : TrainingHistory.BatchHistory) =
             //printfn "LOSS %g" h.AverageLoss
             totalTrained <- batchSize + totalTrained
-            let progress = float32 totalTrained / (epochs * float32 data.Count)
+            let progress = float32 totalTrained / float32 (numEpochs * data.Count)
             batchTrained.Trigger (progress, totalTrained, h.AverageLoss)
             ()
-        let history = trainingModel.Fit(data, batchSize = batchSize, epochs = epochs, callback = fun h -> callback h)
-        trainedPoints <- trainedPoints + int (epochs * float32 data.Count)
-        this.GenerateMesh ()
+        for epoch in 0..(numEpochs-1) do
+            let history = trainingModel.Fit(data, batchSize = batchSize, epochs = 1.0f, callback = fun h -> callback h)
+            trainedPoints <- trainedPoints + data.Count
+            this.GenerateMesh ()
         ()
 
     member this.Save () =
@@ -315,7 +315,7 @@ type Trainer () =
 
         let voxels = SdfKit.Voxels.SampleSdf (sdf, data.VolumeMin, data.VolumeMax, nx, ny, nz, batchSize = batchSize, maxDegreeOfParallelism = 2)
         let mesh = SdfKit.MarchingCubes.CreateMesh (voxels, 0.0f, step = 1)
-        mesh.WriteObj (dataDir + sprintf "/Onewheel%d.obj" trainedPoints)
+        mesh.WriteObj (dataDir + sprintf "/Onewheel_s%d_d%d_c%d_%d.obj" (int outputScale) (int (1.0f/samplingDistance)) (int (1.0f/lossClipDelta)) trainedPoints)
         ()
 
 
