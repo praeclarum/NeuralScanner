@@ -196,6 +196,7 @@ type Trainer () =
     let networkDepth = 8
     let networkWidth = 512
     let batchSize = 1024
+    let useTanh = false
     //let dropoutRate = 0.2f
 
     // Derived parameters
@@ -217,7 +218,8 @@ type Trainer () =
         let houtput =
             (seq{networkDepth/2..(networkDepth-1)}
              |> Seq.fold (fun a i -> hiddenLayer a i (i + 1 < networkDepth)) inner)
-        let output = houtput.Dense(1, weightsInit=weightsInit, name="raw_distance").Tanh ("distance")
+        let output = houtput.Dense(1, weightsInit=weightsInit, name="raw_distance")
+        let output = if useTanh then output.Tanh ("distance") else output
         let model = Model (input, output, "SDF")
         //let r = model.Compile (Loss.MeanAbsoluteError,
         //                       new AdamOptimizer(learningRate))
@@ -306,8 +308,8 @@ type Trainer () =
             for i in 0..(x.Length-1) do
                 let r = results.[i].[0]
                 let yvec = Vector4(1.0f, 1.0f, 1.0f, r.[0])
-                if numPoints < totalPoints / 100 then
-                    printfn "%g" yvec.W
+                //if numPoints < totalPoints / 100 then
+                //    printfn "%g" yvec.W
                 y.[i] <- yvec
             numPoints <- numPoints + y.Length
             let progress = float numPoints / float totalPoints
@@ -315,7 +317,7 @@ type Trainer () =
 
         let voxels = SdfKit.Voxels.SampleSdf (sdf, data.VolumeMin, data.VolumeMax, nx, ny, nz, batchSize = batchSize, maxDegreeOfParallelism = 2)
         let mesh = SdfKit.MarchingCubes.CreateMesh (voxels, 0.0f, step = 1)
-        mesh.WriteObj (dataDir + sprintf "/Onewheel_s%d_d%d_c%d_%d.obj" (int outputScale) (int (1.0f/samplingDistance)) (int (1.0f/lossClipDelta)) trainedPoints)
+        mesh.WriteObj (dataDir + sprintf "/Onewheel_s%d_d%d_c%d_%s_%d.obj" (int outputScale) (int (1.0f/samplingDistance)) (int (1.0f/lossClipDelta)) (if useTanh then "tanh" else "n") trainedPoints)
         ()
 
 
