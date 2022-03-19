@@ -36,7 +36,8 @@ and LossGraphView () =
     inherit UIView ()
 
     let valueLabel = new UILabel(Frame = base.Bounds,
-                                 AutoresizingMask = UIViewAutoresizing.FlexibleDimensions)
+                                 AutoresizingMask = UIViewAutoresizing.FlexibleDimensions,
+                                 Font = UIFont.BoldSystemFontOfSize (nfloat 24.0))
     do base.AddSubview valueLabel
 
     let progressView = new UIProgressView (Frame = base.Bounds,
@@ -50,7 +51,7 @@ and LossGraphView () =
             progressView.Progress <- float32 progress
             losses.Add loss
             this.SetNeedsDisplay ()
-            valueLabel.Text <- sprintf "%.4f %.1f%%" loss (progress * 100.0f))
+            valueLabel.Text <- sprintf "%.5f %.1f%%" loss (progress * 100.0f))
 
     override this.Draw (rect) =
         UIColor.SystemBackground.SetFill ()
@@ -59,7 +60,7 @@ and LossGraphView () =
             let bounds = this.Bounds
 
             let dxdi = bounds.Width / nfloat (float (losses.Count - 1))
-            let dydl = bounds.Height / nfloat 0.03
+            let dydl = bounds.Height / nfloat 0.1
 
             UIColor.SystemYellow.SetFill ()
             let c = UIGraphics.GetCurrentContext ()

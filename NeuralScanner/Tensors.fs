@@ -150,7 +150,6 @@ type SdfFrame (depthPath : string, dataDirectory : string, samplingDistance : fl
                     float32 (-StaticRandom.NextDouble()) * depth, 1.0f
         let pos = worldPosition x y depthOffset - Vector4(poi, 1.0f)
         let outputSignedDistance = -depthOffset * outputScale
-        //let outputSignedDistance = 0.05f
         let inputs = [| Tensor.Array(vector3Shape, pos.X, pos.Y, pos.Z)
                         Tensor.Array(freespaceShape, free)
                         Tensor.Array(distanceShape, outputSignedDistance) |]
@@ -188,18 +187,17 @@ type SdfDataSet (dataDirectory : string, samplingDistance : float32, outputScale
 
 type Trainer () =
 
-    let outputScale = 1.0f
+    let outputScale = 50.0f
 
     let networkDepth = 8
     let networkWidth = 512
-    let dropoutRate = 0.2f
+    //let dropoutRate = 0.2f
 
-    let learningRate = 1.0e-5f
+    let learningRate = 5.0e-5f
 
     let samplingDistance = 1.0e-3f
 
     let lossClipDelta = 1.0e-2f * outputScale
-    //let lossClipDelta = 0.4f
 
     let batchSize = 1024
 
@@ -211,7 +209,8 @@ type Trainer () =
         let input = Tensor.Input("xyz", 3)
         let hiddenLayer (x : Tensor) (i : int) (drop : bool) =
             let r = x.Dense(networkWidth, weightsInit=weightsInit, name=sprintf "hidden%d" i).ReLU(sprintf "relu%d" i)
-            if false && drop then r.Dropout(dropoutRate, name=sprintf "drop%d" i) else r
+            //if drop then r.Dropout(dropoutRate, name=sprintf "drop%d" i) else r
+            r
         let houtput1 =
             (seq{0..(networkDepth/2-1)}
              |> Seq.fold (fun a i -> hiddenLayer a i true) input)
@@ -238,9 +237,9 @@ type Trainer () =
 
         let surfaceLoss = clipOutput.Loss(clipExpected, Loss.MeanAbsoluteError)
 
-        let freespaceLoss = (0.0f - output).Clip(0.0f, lossClipDelta).Loss(Tensor.Constant(0.0f, 1), Loss.MeanAbsoluteError)
+        let freespaceLoss = (0.0f - clipOutput).Clip(0.0f, lossClipDelta)
 
-        let totalLoss = surfaceLoss * (1.0f - inputFreespace) //+ freespaceLoss * inputFreespace
+        let totalLoss = surfaceLoss * (1.0f - inputFreespace) + freespaceLoss * inputFreespace
 
         model.AddLoss (totalLoss)
         let r = model.Compile (new AdamOptimizer (learningRate))
@@ -274,7 +273,7 @@ type Trainer () =
         printfn "%O" trainingModel
         //this.GenerateMesh ()
         let mutable totalTrained = 0
-        let epochs = 1.125f
+        let epochs = 2.0f
         let callback (h : TrainingHistory.BatchHistory) =
             //printfn "LOSS %g" h.AverageLoss
             totalTrained <- batchSize + totalTrained
