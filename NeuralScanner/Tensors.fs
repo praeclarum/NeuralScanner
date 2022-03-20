@@ -189,10 +189,10 @@ type SdfDataSet (dataDirectory : string, samplingDistance : float32, outputScale
 type Trainer () =
 
     // Hyperparameters
-    let outputScale = 50.0f
+    let outputScale = 200.0f
     let samplingDistance = 1.0e-3f
     let lossClipDelta = 1.0e-2f * outputScale
-    let learningRate = 5.0e-5f
+    let learningRate = 1.0e-6f * outputScale
     let networkDepth = 8
     let networkWidth = 512
     let batchSize = 1024
@@ -316,8 +316,9 @@ type Trainer () =
             printfn "NN Sample Progress: %.1f" (progress * 100.0)
 
         let voxels = SdfKit.Voxels.SampleSdf (sdf, data.VolumeMin, data.VolumeMax, nx, ny, nz, batchSize = batchSize, maxDegreeOfParallelism = 2)
+        voxels.ClipToBounds ()
         let mesh = SdfKit.MarchingCubes.CreateMesh (voxels, 0.0f, step = 1)
-        mesh.WriteObj (dataDir + sprintf "/Onewheel_s%d_d%d_c%d_%s_%d.obj" (int outputScale) (int (1.0f/samplingDistance)) (int (1.0f/lossClipDelta)) (if useTanh then "tanh" else "n") trainedPoints)
+        mesh.WriteObj (dataDir + sprintf "/Onewheel_s%d_d%d_c%d_%s_l%d_%d.obj" (int outputScale) (int (1.0f/samplingDistance)) (int (1.0f/lossClipDelta)) (if useTanh then "tanh" else "n") (int (1.0f/learningRate)) trainedPoints)
         ()
 
 

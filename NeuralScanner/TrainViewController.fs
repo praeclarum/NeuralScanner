@@ -59,14 +59,23 @@ and LossGraphView () =
         if losses.Count > 1 then
             let bounds = this.Bounds
 
-            let dxdi = bounds.Width / nfloat (float (losses.Count - 1))
-            let dydl = bounds.Height / nfloat 0.1
+            let maxn = 256
+            let n = min maxn losses.Count
+            let b = losses.Count - n
+
+            let mutable sum = 0.0f
+            for i in 0..(n - 1) do
+                sum <- sum + losses.[b + i]
+            let mean = sum / float32 n
+
+            let dxdi = bounds.Width / nfloat (float (n - 1))
+            let dydl = bounds.Height / nfloat (mean * 2.0f)
 
             UIColor.SystemYellow.SetFill ()
             let c = UIGraphics.GetCurrentContext ()
-            for i in 0..(losses.Count - 1) do
+            for i in 0..(n - 1) do
                 let x = nfloat (float i) * dxdi
-                let y = bounds.Height - nfloat (losses.[i]) * dydl
+                let y = bounds.Height - nfloat (losses.[b + i]) * dydl
                 if i = 0 then
                     c.MoveTo (x, y)
                 else
