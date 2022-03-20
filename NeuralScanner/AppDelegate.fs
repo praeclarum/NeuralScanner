@@ -18,6 +18,8 @@ type AppDelegate() =
         let renderVC = new RenderViewController(Title = "Render")
         let captureVC = new CaptureViewController()
         let trainVC = new TrainViewController()
+        let projectsVC = new ProjectsViewController ()
+        let projectsNC = new UINavigationController (projectsVC)
 
         let tabs = new UITabBarController ()
         let tabVCs : UIViewController[] =
@@ -29,7 +31,12 @@ type AppDelegate() =
             |]
         tabs.SetViewControllers (tabVCs, false)
 
-        this.Window.RootViewController <- tabs
+        let split = new UISplitViewController(UISplitViewControllerStyle.DoubleColumn)
+        split.PrimaryBackgroundStyle <- UISplitViewControllerBackgroundStyle.Sidebar
+        split.SetViewController(projectsNC, UISplitViewControllerColumn.Primary)
+        split.SetViewController(trainVC, UISplitViewControllerColumn.Secondary)
+
+        this.Window.RootViewController <- split
         this.Window.MakeKeyAndVisible()
         true
         
