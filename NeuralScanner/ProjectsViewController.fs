@@ -15,6 +15,15 @@ type ProjectsViewController () =
         this.NavigationItem.RightBarButtonItem <- new UIBarButtonItem (UIBarButtonSystemItem.Add, this, new ObjCRuntime.Selector ("addProject:"))
         this.RefreshProjects ()
 
+    override this.RowSelected (tableView, indexPath) =
+        let project = projects.[indexPath.Row]
+        match this.SplitViewController with
+        | null -> ()
+        | split ->
+            let projectVC = new ProjectViewController (project)
+            let projectNC = new UINavigationController (projectVC)
+            split.SetViewController (projectNC, UISplitViewControllerColumn.Secondary)
+
     override this.GetCell (tableView, indexPath) =
         let cell =
             match tableView.DequeueReusableCell ("P") with

@@ -8,14 +8,28 @@ module ProjectDefaults =
     let learningRate = 1.0e-6f
 
 
+type Project (settings : ProjectSettings, projectDir : string) =
 
-type Project (settings : ProjectSettings) =
+    let mutable captureFiles = [| |]
+
+    let changed = Event<string> ()
+
+    member this.Changed = changed.Publish
+
+    member this.ProjectDirectory = projectDir
+    member this.CaptureDirectory = projectDir
 
     member this.Settings = settings
 
     member this.Name = this.Settings.Name
 
+    member this.NumCaptures = captureFiles.Length
+
     override this.ToString () = sprintf "Project %s" this.Name
+
+    member this.UpdateCaptures () =
+        captureFiles <- Directory.GetFiles (projectDir, "*_Depth.pixelbuffer")
+        changed.Trigger "NumCaptures"
 
 
 and ProjectSettings (initialName : string, initialLearningRate : float32) =
@@ -40,7 +54,8 @@ module ProjectManager =
             let settings =
                 try Config.Read<ProjectSettings> (settingsPath)
                 with _ -> ProjectSettings ("Untitled", ProjectDefaults.learningRate)
-            let project = Project (settings)
+            let project = Project (settings, projectDir)
+            project.UpdateCaptures ()
             loadedProjects <- loadedProjects.Add (projectDir, project)
             project
 

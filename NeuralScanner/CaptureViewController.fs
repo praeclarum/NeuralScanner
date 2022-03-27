@@ -8,8 +8,10 @@ open UIKit
 open ARKit
 
 
-type CaptureViewController () =
+type CaptureViewController (project : Project) =
     inherit UIViewController ()
+
+    let outputDir = project.CaptureDirectory
 
     let captureButton =
         let b = UIButton.FromType UIButtonType.RoundedRect
@@ -25,8 +27,6 @@ type CaptureViewController () =
         new ARWorldTrackingConfiguration(FrameSemantics = semantics)
 
     let mutable needsCapture = false
-
-    let outputDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
 
     let outputPixelBuffer (prefix : string) (name : string) (buffer : CoreVideo.CVPixelBuffer) =
         match buffer.PixelFormatType with
@@ -91,24 +91,36 @@ type CaptureViewController () =
 
     let mutable numCapturedFrames = 0
 
+    let updateProject () =
+        project.UpdateCaptures ()
+        ()
+
     override this.LoadView () =
         this.View <- sceneView
 
     override this.ViewDidLoad () =
         base.ViewDidLoad ()
 
+        this.NavigationItem.RightBarButtonItem <- new UIBarButtonItem(UIBarButtonSystemItem.Done, EventHandler(fun _ _ ->
+            async {
+                updateProject ()
+                this.BeginInvokeOnMainThread (fun _ ->
+                    this.DismissViewController (true, null))
+            }
+            |> Async.Start))
+
         let bounds = this.View.Bounds
         let buttonHeight = nfloat 88.0
         captureButton.Frame <- CGRect(nfloat 0.0, bounds.Height - buttonHeight - nfloat 128.0, bounds.Width, buttonHeight)
         captureButton.AutoresizingMask <- UIViewAutoresizing.FlexibleWidth ||| UIViewAutoresizing.FlexibleTopMargin
-        captureButton.BackgroundColor <- UIColor.SystemOrangeColor
+        captureButton.BackgroundColor <- UIColor.SystemOrange
         captureButton.TouchUpInside.Add (fun _ ->
             needsCapture <- true)
         this.View.AddSubview captureButton
 
         posLabel.Frame <- CGRect(nfloat 0.0, captureButton.Frame.Top - buttonHeight, bounds.Width, buttonHeight)
         posLabel.AutoresizingMask <- UIViewAutoresizing.FlexibleWidth ||| UIViewAutoresizing.FlexibleTopMargin
-        posLabel.BackgroundColor <- UIColor.SystemBackgroundColor.ColorWithAlpha(nfloat 0.1)
+        posLabel.BackgroundColor <- UIColor.SystemBackground.ColorWithAlpha(nfloat 0.1)
         posLabel.TextAlignment <- UITextAlignment.Center
         posLabel.Text <- "(0.000, 0.000, 0.000)"
         posLabel.Font <- UIFont.SystemFontOfSize (nfloat 0.75 * buttonHeight)

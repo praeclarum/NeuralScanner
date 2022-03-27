@@ -16,7 +16,6 @@ type AppDelegate() =
 
         let homeVC = new UIViewController(Title = "Home")
         let renderVC = new RenderViewController(Title = "Render")
-        let captureVC = new CaptureViewController()
         let trainVC = new TrainViewController()
         let projectsVC = new ProjectsViewController ()
         let projectsNC = new UINavigationController (projectsVC)
@@ -27,7 +26,6 @@ type AppDelegate() =
                 new UINavigationController (trainVC)
                 //new UINavigationController (homeVC)
                 new UINavigationController (renderVC)
-                new UINavigationController (captureVC)
             |]
         tabs.SetViewControllers (tabVCs, false)
 
