@@ -129,6 +129,16 @@ type SdfFrame (depthPath : string, dataDirectory : string, samplingDistance : fl
 
     member this.PointCount = inboundIndices.Length
 
+    member this.GetAllPoints () : SceneKit.SCNVector3[] =
+        let points = ResizeArray<SceneKit.SCNVector3>()
+        for x in 0..(width-1) do
+            for y in 0..(height-1) do
+                let i = index x y
+                if confidences.[i] > 0uy then
+                    let p = worldPosition x y 0.0f
+                    points.Add (SceneKit.SCNVector3(p.X, p.Y, p.Z))
+        points.ToArray ()
+
     member this.GetRow (inside: bool, poi : Vector3) : struct (Tensor[]*Tensor[]) =
         // i = y * width + x
         let index = inboundIndices.[StaticRandom.Next(inboundIndices.Length)]

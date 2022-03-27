@@ -6,7 +6,7 @@ open CoreGraphics
 open ObjCRuntime
 open UIKit
 open ARKit
-
+open SceneKit
 
 type CaptureViewController (project : Project) =
     inherit UIViewController ()
@@ -28,7 +28,7 @@ type CaptureViewController (project : Project) =
 
     let mutable needsCapture = false
 
-    let outputPixelBuffer (prefix : string) (name : string) (buffer : CoreVideo.CVPixelBuffer) =
+    let outputPixelBuffer (prefix : string) (name : string) (buffer : CoreVideo.CVPixelBuffer) : string =
         match buffer.PixelFormatType with
         | CoreVideo.CVPixelFormatType.CV420YpCbCr8BiPlanarFullRange ->
             let path = IO.Path.Combine(outputDir, sprintf "%s_%s.jpg" prefix name)
@@ -36,7 +36,10 @@ type CaptureViewController (project : Project) =
             use uiimage = UIImage.FromImage(image, UIScreen.MainScreen.Scale, UIImageOrientation.Up)
             let scale = uiimage.CurrentScale
             printfn "SCALE = %A" scale
-            uiimage.AsJPEG().Save(path, true) |> ignore
+            if uiimage.AsJPEG().Save(path, true) then
+                path
+            else
+                failwithf "Failed to save JPEG"
         | _ ->
             let path = IO.Path.Combine(outputDir, sprintf "%s_%s.pixelbuffer" prefix name)
             use w = IO.File.OpenWrite (path)
@@ -58,7 +61,7 @@ type CaptureViewController (project : Project) =
             bw.Write (int dataSize)
             bw.Write (int pixelFormat)
             bw.Write (array)
-        ()
+            path
 
     let writeVector4 (w : IO.TextWriter) (name : string) (v : OpenTK.Vector4) =
         w.WriteLine(String.Format(System.Globalization.CultureInfo.InvariantCulture, "{0} {1:0.000000000} {2:0.000000000} {3:0.000000000} {4:0.000000000}", name, v.X, v.Y, v.Z, v.W))
@@ -160,13 +163,38 @@ type CaptureViewController (project : Project) =
             printfn "PROJECTION %A" cameraProjection
             printfn "TRANSFORM  %A" cameraTransform
             printfn "POSITION   %A" cameraPosition
-            outputPixelBuffer framePrefix "Depth" sceneDepth.DepthMap
-            outputPixelBuffer framePrefix "DepthConfidence" sceneDepth.ConfidenceMap
-            outputPixelBuffer framePrefix "Image" capturedImage
+            let depthPath = outputPixelBuffer framePrefix "Depth" sceneDepth.DepthMap
+            let _ = outputPixelBuffer framePrefix "DepthConfidence" sceneDepth.ConfidenceMap
+            let _ = outputPixelBuffer framePrefix "Image" capturedImage
             outputSize framePrefix "Resolution" cameraResolution
             outputNMatrix4 framePrefix "Projection" cameraProjection
             outputNMatrix4 framePrefix "Transform" cameraTransform
             outputNMatrix3 framePrefix "Intrinsics" cameraIntrinsics
+            Threading.ThreadPool.QueueUserWorkItem(fun _ ->
+                this.PreviewCapture (depthPath)) |> ignore
+
+    member this.PreviewCapture (depthPath) : unit =
+        let frame = SdfFrame(depthPath, outputDir, 0.001f, 1.0f)
+        let pointCoords = frame.GetAllPoints ()
+        printfn "POINTS %A" pointCoords
+
+        let source = SCNGeometrySource.FromVertices(pointCoords)
+        let element =
+            use elemStream = new IO.MemoryStream ()
+            use elemWriter = new IO.BinaryWriter (elemStream)
+            for i in 0..(pointCoords.Length - 1) do
+                elemWriter.Write (i)
+            elemWriter.Flush ()
+            elemStream.Position <- 0L
+            let data = NSData.FromStream (elemStream)
+            SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Point, nint pointCoords.Length, nint 4)
+        let geometry = SCNGeometry.Create([|source|], [|element|])
+        let node = SCNNode.FromGeometry (geometry)
+        SCNTransaction.Begin ()
+        let root = sceneView.Scene.RootNode
+        root.AddChildNode node
+        SCNTransaction.Commit ()
+        ()
 
 
 and CaptureViewDelegate () =

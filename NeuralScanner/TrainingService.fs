@@ -75,7 +75,14 @@ type TrainingService (project : Project) =
         printfn "%s" model.Summary
         model
 
-    let data = SdfDataSet (dataDir, samplingDistance, outputScale)
+    let mutable data : SdfDataSet option = None
+    let getData () =
+        match data with
+        | Some x -> x
+        | None ->
+            let d = SdfDataSet (dataDir, samplingDistance, outputScale)
+            data <- Some d
+            d
 
     let modelPath = dataDir + "/Model.zip"
 
@@ -99,6 +106,7 @@ type TrainingService (project : Project) =
         //let data = SdfDataSet ("/Users/fak/Data/NeuralScanner/Onewheel")
         //let struct(inputs, outputs) = data.GetRow(0, null)
         printfn "%O" trainingModel
+        let data = getData ()
         //this.GenerateMesh ()
         let mutable totalTrained = 0
         let numEpochs = 10
@@ -123,6 +131,8 @@ type TrainingService (project : Project) =
         let nx, ny, nz = 64, 64, 64
         let mutable numPoints = 0
         let totalPoints = nx*ny*nz
+
+        let data = getData ()
 
         let sdf (x : Memory<Vector3>) (y : Memory<Vector4>) =
             let batchTensors = Array.init x.Length (fun i ->
