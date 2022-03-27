@@ -189,7 +189,14 @@ type CaptureViewController (project : Project) =
             let data = NSData.FromStream (elemStream)
             SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Point, nint pointCoords.Length, nint 4)
         let geometry = SCNGeometry.Create([|source|], [|element|])
+        let material = SCNMaterial.Create ()
+        material.Diffuse.ContentColor <- UIColor.FromRGB(0xCC, 0xCC, 0x00)
+        element.PointSize <- nfloat 0.01f
+        element.MinimumPointScreenSpaceRadius <- nfloat 1.0f
+        element.MaximumPointScreenSpaceRadius <- nfloat 5.0f
+        geometry.FirstMaterial <- material
         let node = SCNNode.FromGeometry (geometry)
+        node.Opacity <- nfloat 0.75
         SCNTransaction.Begin ()
         let root = sceneView.Scene.RootNode
         root.AddChildNode node
