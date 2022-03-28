@@ -51,7 +51,7 @@ type TrainingService (project : Project) =
 
     let changed = Event<_> ()
 
-    let mutable training = false
+    let mutable training : Threading.CancellationTokenSource option = None
 
     // Hyperparameters
     let outputScale = 200.0f
@@ -64,7 +64,7 @@ type TrainingService (project : Project) =
     let useTanh = false
     //let dropoutRate = 0.2f
 
-    let numEpochs = 10
+    let numEpochs = 1_000
 
     // Derived parameters
 
@@ -148,12 +148,13 @@ type TrainingService (project : Project) =
 
     member this.BatchTrained = batchTrained.Publish
 
-    member this.Train () =
+    member private this.Train (cancel : Threading.CancellationToken) =
         //let data = SdfDataSet ("/Users/fak/Data/NeuralScanner/Onewheel")
         //let struct(inputs, outputs) = data.GetRow(0, null)
         let mutable totalTrained = 0
         let callback (h : TrainingHistory.BatchHistory) =
             //printfn "LOSS %g" h.AverageLoss
+            h.ContinueTraining <- not cancel.IsCancellationRequested
             totalTrained <- batchSize + totalTrained
             let progress = float32 totalTrained / float32 (numEpochs * data.Value.Count)
             let loss = h.AverageLoss
@@ -165,10 +166,11 @@ type TrainingService (project : Project) =
             printfn "%O" trainingModel
             let data = data.Value
             //this.GenerateMesh ()
-            for epoch in 0..(numEpochs-1) do
+            let mutable epoch = 0
+            while not cancel.IsCancellationRequested && epoch < numEpochs do
                 let history = trainingModel.Fit(data, batchSize = batchSize, epochs = 1.0f, callback = fun h -> callback h)
-                trainedPoints <- trainedPoints + data.Count
-                this.GenerateMesh ()
+                trainedPoints <- trainedPoints + history.Batches.Length * batchSize
+                epoch <- epoch + 1
         with ex ->
             reportError ex
 
@@ -211,20 +213,26 @@ type TrainingService (project : Project) =
 
     member this.Changed = changed.Publish
 
-    member this.IsTraining = training
+    member this.IsTraining = training.IsSome
 
     member this.Run () =
-        if not training then
-            training <- true
+        match training with
+        | Some _ -> ()
+        | None ->
+            let cts = new Threading.CancellationTokenSource ()
+            training <- Some cts
             changed.Trigger "IsTraining"
             async {
-                this.Train ()
+                this.Train (cts.Token)
             }
             |> Async.Start
 
     member this.Pause () =
-        if training then
-            training <- false
+        match training with
+        | None -> ()
+        | Some cts ->
+            training <- None
+            cts.Cancel ()
             changed.Trigger "IsTraining"
 
 
