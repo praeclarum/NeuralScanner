@@ -57,6 +57,7 @@ type Project (settings : ProjectSettings, projectDir : string) =
         this.Settings.Save (settingsPath)
         //let fileOutput = IO.File.ReadAllText(settingsPath)
         //printfn "FILE:\n%s" fileOutput
+        //let newConfig = Config.Read<ProjectSettings> (settingsPath)
         ()
 
 
@@ -89,12 +90,11 @@ module ProjectManager =
                 try
                     //printfn "LOAD FROM: %s" settingsPath
                     Config.Read<ProjectSettings> (settingsPath)
-                with
-                | :? System.IO.FileNotFoundException ->
-                    ProjectSettings ("Untitled", ProjectDefaults.learningRate, DateTime.UtcNow)
-                | ex ->
+                with ex ->
                     printfn "LOAD ERROR: %O" ex
-                    ProjectSettings ("Untitled", ProjectDefaults.learningRate, DateTime.UtcNow)
+                    let s = ProjectSettings ("Untitled", ProjectDefaults.learningRate, DateTime.UtcNow)
+                    s.Save (settingsPath)
+                    s
             let project = Project (settings, projectDir)
             project.UpdateCaptures ()
             loadedProjects <- loadedProjects.Add (projectDir, project)

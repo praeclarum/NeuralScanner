@@ -16,15 +16,15 @@ open FSharp.NativeInterop
 type LossGraphView () =
     inherit UIView (Frame = CGRect (0.0, 0.0, 320.0, 200.0), Opaque = false)
 
-    let valueLabel = new UILabel(Frame = base.Bounds,
-                                 AutoresizingMask = UIViewAutoresizing.FlexibleDimensions,
+    let valueLabel = new UILabel(Frame = CGRect (0.0, 0.0, 320.0, 32.0),
+                                 AutoresizingMask = (UIViewAutoresizing.FlexibleBottomMargin ||| UIViewAutoresizing.FlexibleWidth),
                                  Font = UIFont.BoldSystemFontOfSize (nfloat 24.0))
     do base.AddSubview valueLabel
 
-    let progressView = new UIProgressView (Frame = base.Bounds,
-                                           AutoresizingMask = UIViewAutoresizing.FlexibleDimensions,
-                                           Alpha = nfloat 0.0)
-    do base.AddSubview progressView
+    //let progressView = new UIProgressView (Frame = base.Bounds,
+    //                                       AutoresizingMask = UIViewAutoresizing.FlexibleDimensions,
+    //                                       Alpha = nfloat 0.0)
+    //do base.AddSubview progressView
 
     let losses = ResizeArray<float32> ()
 
@@ -40,17 +40,17 @@ type LossGraphView () =
                 losses.Clear ()
                 losses.AddRange (loss)
                 this.SetNeedsDisplay ()
-                valueLabel.Text <- sprintf "%.5f %.1f%%" loss.[loss.Length - 1] 0.0)
+                valueLabel.Text <- sprintf "%.5f" loss.[loss.Length - 1])
 
     member this.AddLoss (progress : float32, loss : float32) =
         this.BeginInvokeOnMainThread (fun _ ->
-            progressView.Progress <- float32 progress
-            progressView.Alpha <- if 1e-6f <= progress && progress <= (1.0f-1e-6f)
-                                  then nfloat 1.0
-                                  else  nfloat 0.0
+            //progressView.Progress <- float32 progress
+            //progressView.Alpha <- if 1e-6f <= progress && progress <= (1.0f-1e-6f)
+            //                      then nfloat 1.0
+            //                      else  nfloat 0.0
             losses.Add loss
             this.SetNeedsDisplay ()
-            valueLabel.Text <- sprintf "%.5f %.1f%%" loss (progress * 100.0f))
+            valueLabel.Text <- sprintf "%.5f" loss)
 
     override this.Draw (rect) =
         UIColor.Clear.SetFill ()
@@ -70,7 +70,7 @@ type LossGraphView () =
             let dxdi = bounds.Width / nfloat (float (n - 1))
             let dydl = bounds.Height / nfloat (mean * 2.0f)
 
-            UIColor.SystemYellow.SetFill ()
+            UIColor.SystemYellow.ColorWithAlpha(nfloat 0.75f).SetFill ()
             let c = UIGraphics.GetCurrentContext ()
             for i in 0..(n - 1) do
                 let x = nfloat (float i) * dxdi
