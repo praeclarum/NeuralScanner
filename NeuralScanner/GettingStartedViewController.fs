@@ -10,58 +10,27 @@ open Praeclarum.AutoLayout
 
 
 type GettingStartedViewController () =
-    inherit UIViewController ()
+    inherit BaseViewController (Title = "Getting Started")
 
-    // Services
+    let textView = new UITextView (Frame = UIScreen.MainScreen.Bounds,
+                                   BackgroundColor = UIColor.SystemBackground,
+                                   TranslatesAutoresizingMaskIntoConstraints = false,
+                                   AlwaysBounceVertical = true,
+                                   Editable = false    )
 
-    // UI
-    let sceneView = new UIView (Frame = UIScreen.MainScreen.Bounds,
-                                BackgroundColor = UIColor.SystemGreen,
-                                TranslatesAutoresizingMaskIntoConstraints = false)
-
-    let mutable loadSubs : IDisposable[] = Array.empty
-
-
-    member this.UpdateUI () =
+    override this.UpdateUI () =
         ()
 
-    override this.ViewDidLoad () =
-        base.ViewDidLoad ()
+    override this.AddUI (view) =
+        textView.Text <- "Hello world this is a lot of text"
+        view.AddSubview (textView)
+        [|
+            textView.LayoutLeft == view.LayoutLeft
+            textView.LayoutRight == view.LayoutRight
+            textView.LayoutBottom == view.LayoutBottom
+            textView.LayoutTop == view.LayoutTop
+        |]
 
-        this.View.BackgroundColor <- UIColor.SystemBackground
-
-        //
-        // Subscribe to events
-        //
-        loadSubs <-
-            [|
-            |]
-        this.UpdateUI ()
-
-        //
-        // Layout
-        //
-
-        sceneView.TranslatesAutoresizingMaskIntoConstraints <- false
-
-        let view = this.View
-        view.AddSubview (sceneView)
-
-        view.AddConstraints
-            [|
-                sceneView.LayoutLeft == view.LayoutLeft
-                sceneView.LayoutRight == view.LayoutRight
-                sceneView.LayoutBottom == view.LayoutBottom
-                sceneView.LayoutTop == view.LayoutBottom
-            |]
-
-    // This VC is going to be tossed out
-    member this.Stop () =
-        let subs = loadSubs
-        loadSubs <- Array.empty
-        for s in subs do
-            s.Dispose ()
-        ()
 
 
 

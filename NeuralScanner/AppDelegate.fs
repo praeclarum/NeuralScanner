@@ -20,8 +20,7 @@ type AppDelegate() =
         let projectsVC = new ProjectsViewController ()
         let projectsNC = new UINavigationController (projectsVC)
 
-        let gettingStartedVC = new UIViewController (Title = "Getting Started")
-        gettingStartedVC.View.BackgroundColor <- UIColor.SystemBackground
+        let gettingStartedVC = new GettingStartedViewController ()
         let gettingStartedNC = new UINavigationController (gettingStartedVC)
 
         //let tabs = new UITabBarController ()

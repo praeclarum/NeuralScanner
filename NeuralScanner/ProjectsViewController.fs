@@ -12,16 +12,23 @@ type ProjectsViewController () =
 
     override this.ViewDidLoad () =
         base.ViewDidLoad ()
-        this.NavigationItem.RightBarButtonItem <- new UIBarButtonItem (UIBarButtonSystemItem.Add, this, new ObjCRuntime.Selector ("addProject:"))
+        this.NavigationItem.RightBarButtonItems <-
+            [|
+                new UIBarButtonItem (UIBarButtonSystemItem.Add, this, new ObjCRuntime.Selector ("addProject:"))
+                new UIBarButtonItem (UIImage.GetSystemImage "questionmark.circle", UIBarButtonItemStyle.Plain, this, new ObjCRuntime.Selector ("showHelp:"))
+            |]
         this.RefreshProjects ()
 
     override this.RowSelected (tableView, indexPath) =
         let project = projects.[indexPath.Row]
+        let projectVC = new ProjectViewController (project)
+        let projectNC = new UINavigationController (projectVC)
+        this.ShowDetailViewController (projectNC)
+
+    member this.ShowDetailViewController (detailVC : UIViewController) =
         match this.SplitViewController with
         | null -> ()
         | split ->
-            let projectVC = new ProjectViewController (project)
-            let projectNC = new UINavigationController (projectVC)
             match split.GetViewController (UISplitViewControllerColumn.Secondary) with
             | :? UINavigationController as nc ->
                 for vc in nc.ViewControllers do
@@ -29,7 +36,7 @@ type ProjectsViewController () =
                     | :? BaseViewController as vc -> vc.StopUI ()
                     | _ -> ()
             | _ -> ()
-            split.SetViewController (projectNC, UISplitViewControllerColumn.Secondary)
+            split.SetViewController (detailVC, UISplitViewControllerColumn.Secondary)
 
     override this.GetCell (tableView, indexPath) =
         let cell =
@@ -50,6 +57,12 @@ type ProjectsViewController () =
             this.RefreshProjects ()
         }
         |> Async.Start
+
+    [<Export("showHelp:")>]
+    member private this.HandleHelp (sender : NSObject) =
+        let vc = new GettingStartedViewController ()
+        let nc = new UINavigationController (vc)
+        this.ShowDetailViewController nc
 
     member private this.RefreshProjects () =
         async {

@@ -105,6 +105,7 @@ type ProjectViewController (project : Project) =
         ()
 
     override this.SubscribeUI () =
+        nameField.ShouldReturn <- fun x -> x.ResignFirstResponder() |> ignore; false
         [|
             project.Changed.Subscribe (fun _ ->
                 this.BeginInvokeOnMainThread (fun _ ->
