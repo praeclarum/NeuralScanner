@@ -107,7 +107,7 @@ type SdfFrame (depthPath : string) =
 
     let centerPos = worldPosition (width/2) (height/2) 0.0f
 
-    do printfn "%s CENTER = %g, %g, %g" depthPath centerPos.X centerPos.Y centerPos.Z
+    do printfn "FRAME %s center=%g, %g, %g" (IO.Path.GetFileName(depthPath)) centerPos.X centerPos.Y centerPos.Z
 
     let vector3Shape = [| 3 |]
     let freespaceShape = [| 1 |]

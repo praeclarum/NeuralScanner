@@ -131,7 +131,7 @@ type CaptureViewController (project : Project) =
 
     override this.AddUI view =
 
-        this.View.BackgroundColor <- UIColor.SystemGray
+        this.View.BackgroundColor <- UIColor.DarkGray
 
         let fontHeight = nfloat 32.0
         captureButton.BackgroundColor <- UIColor.SystemOrange
@@ -189,12 +189,12 @@ type CaptureViewController (project : Project) =
             let cameraResolution = frame.Camera.ImageResolution
             let cameraIntrinsics = frame.Camera.Intrinsics
             let cameraProjection = frame.Camera.ProjectionMatrix
-            printfn "COLOR      %A" (capturedImage)
-            printfn "DEPTH      %A" sceneDepth
-            printfn "INTRINSICS %A" cameraIntrinsics
-            printfn "PROJECTION %A" cameraProjection
-            printfn "TRANSFORM  %A" cameraTransform
-            printfn "POSITION   %A" cameraPosition
+            //printfn "COLOR      %A" (capturedImage)
+            //printfn "DEPTH      %A" sceneDepth
+            //printfn "INTRINSICS %A" cameraIntrinsics
+            //printfn "PROJECTION %A" cameraProjection
+            //printfn "TRANSFORM  %A" cameraTransform
+            //printfn "POSITION   %A" cameraPosition
             let depthPath = outputPixelBuffer framePrefix "Depth" sceneDepth.DepthMap
             let _ = outputPixelBuffer framePrefix "DepthConfidence" sceneDepth.ConfidenceMap
             let _ = outputPixelBuffer framePrefix "Image" capturedImage

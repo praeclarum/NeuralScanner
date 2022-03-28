@@ -8,7 +8,7 @@ open UIKit
 
 let addFrame (frame : SdfFrame) (sceneView : SCNView) =
     let pointCoords = frame.GetAllPoints ()
-    printfn "POINTS %A" pointCoords
+    //printfn "POINTS %A" pointCoords
 
     let source = SCNGeometrySource.FromVertices(pointCoords)
     let element =
