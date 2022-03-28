@@ -21,7 +21,10 @@ type Project (settings : ProjectSettings, projectDir : string) =
 
     member this.Settings = settings
 
-    member this.Name = this.Settings.Name
+    member this.Name with get () = this.Settings.Name
+                     and set v = this.Settings.Name <- v
+                                 this.Save ()
+                                 changed.Trigger "Name"
 
     member this.NumCaptures = captureFiles.Length
 
@@ -31,12 +34,22 @@ type Project (settings : ProjectSettings, projectDir : string) =
         captureFiles <- Directory.GetFiles (projectDir, "*_Depth.pixelbuffer")
         changed.Trigger "NumCaptures"
 
+    member this.Save () =
+        let settingsPath = Path.Combine (projectDir, "Settings.xml")
+        printfn "SAVE TO: %s" settingsPath
+        this.Settings.Save (settingsPath)
+        let fileOutput = IO.File.ReadAllText(settingsPath)
+        printfn "FILE:\n%s" fileOutput
+
 
 and ProjectSettings (initialName : string, initialLearningRate : float32) =
     inherit Configurable ()
 
     member val Name = initialName with get, set
     member val LearningRate = initialLearningRate with get, set
+
+    override this.Config =
+        base.Config.Add("initialName", this.Name).Add("initialLearningRate", this.LearningRate)
 
 
 module ProjectManager =
@@ -45,6 +58,8 @@ module ProjectManager =
 
     let mutable private loadedProjects : Map<string, Project> = Map.empty
 
+    do Config.EnableReading<ProjectSettings> ()
+
     let loadProject (projectDir : string) : Project =
         match loadedProjects.TryFind projectDir with
         | Some x -> x
@@ -52,8 +67,12 @@ module ProjectManager =
             let projectId = Path.GetFileName (projectDir)
             let settingsPath = Path.Combine (projectDir, "Settings.xml")
             let settings =
-                try Config.Read<ProjectSettings> (settingsPath)
-                with _ -> ProjectSettings ("Untitled", ProjectDefaults.learningRate)
+                try
+                    printfn "LOAD FROM: %s" settingsPath
+                    Config.Read<ProjectSettings> (settingsPath)
+                with ex ->
+                    printfn "LOAD ERROR: %O" ex
+                    ProjectSettings ("Untitled", ProjectDefaults.learningRate)
             let project = Project (settings, projectDir)
             project.UpdateCaptures ()
             loadedProjects <- loadedProjects.Add (projectDir, project)

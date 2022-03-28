@@ -123,7 +123,7 @@ type TrainingService (project : Project) =
         ()
 
     member this.Save () =
-        trainingModel.Save (modelPath)
+        trainingModel.SaveArchive (modelPath)
         ()
 
     member this.GenerateMesh () =

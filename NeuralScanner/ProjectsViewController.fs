@@ -27,11 +27,11 @@ type ProjectsViewController () =
     override this.GetCell (tableView, indexPath) =
         let cell =
             match tableView.DequeueReusableCell ("P") with
-            | null -> new UITableViewCell (UITableViewCellStyle.Subtitle, "P")
-            | x -> x
+            | :? ProjectCell as c -> c
+            | _ -> new ProjectCell ()
         let project = projects.[indexPath.Row]
-        cell.TextLabel.Text <- project.Name
-        cell
+        cell.SetProject (project)
+        upcast cell
 
     override this.RowsInSection (_, section) =
         nint projects.Length
@@ -55,6 +55,31 @@ type ProjectsViewController () =
         }
         |> Async.Start
 
+and ProjectCell () =
+    inherit UITableViewCell (UITableViewCellStyle.Subtitle, "P")
 
+    let mutable projectO : Project option = None
+    let mutable changedSub : IDisposable option = None
+
+    member this.SetProject (project : Project) =
+        // Unsubscribe
+        match changedSub with
+        | None -> ()
+        | Some x -> x.Dispose ()
+        // Remember this project
+        projectO <- Some project
+        // Watch for mutations
+        changedSub <- project.Changed.Subscribe (fun _ ->
+            this.BeginInvokeOnMainThread (fun _ ->
+                this.UpdateUI ())) |> Some
+        // Initial update
+        this.UpdateUI ()
+
+    member this.UpdateUI () =
+        match projectO with
+        | None -> ()
+        | Some project ->
+            this.TextLabel.Text <- project.Name
+            this.DetailTextLabel.Text <- sprintf "%d scans" project.NumCaptures
 
 

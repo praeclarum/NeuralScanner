@@ -30,7 +30,7 @@ type ProjectViewController (project : Project) =
     do trainButtons.AddArrangedSubview (pauseTrainButton)
     do trainButtons.Spacing <- nfloat 44.0
 
-    let nameField = new UITextField (Placeholder = "Name")
+    let nameField = new UITextField (Placeholder = "Name", Text = project.Name)
 
     let labelCaptureInfo = new UILabel (Text = "Object not scanned")
 
@@ -70,6 +70,11 @@ type ProjectViewController (project : Project) =
             this.BeginInvokeOnMainThread (fun _ ->
                 lossView.AddLoss (progress, loss)))
         this.UpdateUI ()
+
+        nameField.ValueChanged.Add (fun _ ->
+            project.Name <- nameField.Text)
+        nameField.EditingChanged.Add (fun _ ->
+            project.Name <- nameField.Text)
 
         captureButton.TouchUpInside.Add(fun _ -> this.HandleCapture())
         trainButton.TouchUpInside.Add (fun _ ->
