@@ -115,16 +115,33 @@ type SdfFrame (depthPath : string, dataDirectory : string, samplingDistance : fl
 
     let mutable inboundIndices = [||]
 
+    member this.CenterPoint =
+        let sx = width/2 - 1
+        let ex = sx + 3
+        let sy = height/2 - 1
+        let ey = sy + 3
+        let mutable sum = Vector3.Zero
+        let mutable n = 0
+        for x in sx..ex do
+            for y in 0..(height-1) do
+                let i = index x y
+                if confidences.[i] > 0uy then
+                    let p = worldPosition x y 0.0f
+                    sum <- Vector3 (sum.X + p.X, sum.Y + p.Y, sum.Z + p.Z)
+                    n <- n + 1
+        if n > 0 then sum / float32 n
+        else sum
+
     member this.FindInBoundPoints (min : Vector3, max : Vector3) =
         let inbounds = ResizeArray<_>()
         for x in 0..(width-1) do
             for y in 0..(height-1) do
                 let i = index x y
                 if confidences.[i] > 0uy then
-                    let p = worldPosition x y 0.001f
-                    //if p.X >= min.X && p.Y >= min.Y && p.Z >= min.Z &&
-                    //   p.X <= max.X && p.Y <= max.Y && p.Z <= max.Z then
-                    inbounds.Add(i)
+                    let p = worldPosition x y 0.0f
+                    if p.X >= min.X && p.Y >= min.Y && p.Z >= min.Z &&
+                       p.X <= max.X && p.Y <= max.Y && p.Z <= max.Z then
+                        inbounds.Add(i)
         inboundIndices <- inbounds.ToArray ()
 
     member this.PointCount = inboundIndices.Length
@@ -177,9 +194,12 @@ type SdfDataSet (dataDirectory : string, samplingDistance : float32, outputScale
     let count = depthFiles |> Seq.sumBy (fun x -> 1)
     do if count = 0 then failwithf "No files in %s" dataDirectory
 
-    let volumeMin = Vector3 (-0.30533359f, -1.12338264f, -0.89218203f)
-    let volumeMax = Vector3 (0.69466641f, -0.62338264f, 0.10781797f)
-    let poi = (volumeMin + volumeMax) * 0.5f
+    let meanCenter =
+        if count > 0 then (frames |> Array.sumBy (fun x -> x.CenterPoint)) / float32 count
+        else Vector3.Zero
+    let volumeMin = meanCenter - 1.0f*Vector3.One // Vector3 (-0.30533359f, -1.12338264f, -0.89218203f)
+    let volumeMax = meanCenter + 1.0f*Vector3.One //Vector3 (0.69466641f, -0.62338264f, 0.10781797f)
+    let poi = meanCenter // (volumeMin + volumeMax) * 0.5f
 
     do for f in frames do f.FindInBoundPoints(volumeMin, volumeMax)
 
