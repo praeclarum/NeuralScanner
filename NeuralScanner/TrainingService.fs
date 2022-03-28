@@ -9,6 +9,42 @@ open System.Globalization
 
 open MetalTensors
 
+type SdfDataSet (project : Project, samplingDistance : float32, outputScale : float32) =
+    inherit DataSet ()
+
+    let dataDirectory = project.CaptureDirectory
+
+    let depthFiles = project.DepthPaths
+
+    let frames =
+        depthFiles
+        |> Array.map (fun x -> project.GetFrame x)
+    let count = depthFiles |> Seq.sumBy (fun x -> 1)
+    do if count = 0 then failwithf "No files in %s" dataDirectory
+
+    let meanCenter =
+        if count > 0 then (frames |> Array.sumBy (fun x -> x.CenterPoint)) / float32 count
+        else Vector3.Zero
+    let volumeMin = meanCenter - 1.0f*Vector3.One // Vector3 (-0.30533359f, -1.12338264f, -0.89218203f)
+    let volumeMax = meanCenter + 1.0f*Vector3.One //Vector3 (0.69466641f, -0.62338264f, 0.10781797f)
+    let poi = meanCenter // (volumeMin + volumeMax) * 0.5f
+
+    do for f in frames do f.FindInBoundPoints(volumeMin, volumeMax)
+
+    member this.VolumeMin = volumeMin
+    member this.VolumeMax = volumeMax
+    member this.VolumeCenter = poi
+
+    override this.Count = frames |> Array.sumBy (fun x -> x.PointCount)
+
+    override this.GetRow (index, _) =
+        let inside = (index % 2) = 0
+        let fi = StaticRandom.Next(frames.Length)
+        let struct (i, o) = frames.[fi].GetRow (inside, poi, samplingDistance, outputScale)
+        //printfn "ROW%A D%A = %A" index inside i.[2].[0]
+        struct (i, o)
+
+
 type TrainingService (project : Project) =
 
     let dataDir = project.CaptureDirectory
@@ -86,7 +122,7 @@ type TrainingService (project : Project) =
         printfn "%s" model.Summary
         model
 
-    let data = lazy SdfDataSet (dataDir, samplingDistance, outputScale)
+    let data = lazy SdfDataSet (project, samplingDistance, outputScale)
             
 
     let modelPath = dataDir + "/Model.zip"

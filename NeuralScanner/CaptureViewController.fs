@@ -15,7 +15,7 @@ type CaptureViewController (project : Project) =
 
     let captureButton =
         let b = UIButton.FromType UIButtonType.RoundedRect
-        b.SetTitle("Capture", UIControlState.Normal)
+        b.SetTitle("Scanner", UIControlState.Normal)
         b.Enabled <- false
         b.Alpha <- nfloat 0.5
         b
@@ -91,23 +91,45 @@ type CaptureViewController (project : Project) =
         w.WriteLine(String.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.000000000} {1:0.000000000}", size.Width, size.Height))
 
     do
-        base.Title <- "Capture"
-        base.TabBarItem.Title <- "Capture"
+        base.Title <- "Scan"
+        base.TabBarItem.Title <- "Scanner"
         base.TabBarItem.Image <- UIImage.GetSystemImage("camera")
-
-    let mutable numCapturedFrames = 0
-
-    let mutable loadSubs : IDisposable[] = Array.empty
-
-    let updateProject () =
-        project.UpdateCaptures ()
-        ()
 
     override this.LoadView () =
         this.View <- sceneView
 
     override this.ViewDidLoad () =
         base.ViewDidLoad ()
+
+        this.NavigationItem.RightBarButtonItem <- new UIBarButtonItem(UIBarButtonSystemItem.Done, EventHandler(fun _ _ ->
+            this.StopUI ()
+            this.DismissViewController (true, null)))
+
+        //
+        // Start session
+        //
+        match sceneView.Session with
+        | null -> printfn "NO ARKIT"
+        | session ->
+            session.Run (arConfig)
+            session.Delegate <- this
+
+    override this.SubscribeUI () =
+        [|
+            captureButton.TouchUpInside.Subscribe (fun _ ->
+                needsCapture <- true)
+        |]
+
+    override this.StopUI () =
+        base.StopUI ()
+        match sceneView.Session with
+        | null -> ()
+        | session ->
+            session.Delegate <- null
+            session.Pause ()
+        sceneView.Stop (this)
+
+    override this.AddUI view =
 
         this.View.BackgroundColor <- UIColor.SystemGray
 
@@ -126,23 +148,6 @@ type CaptureViewController (project : Project) =
         posLabel.Font <- UIFont.SystemFontOfSize (fontHeight)
 
         //
-        // Events
-        //
-        this.NavigationItem.RightBarButtonItem <- new UIBarButtonItem(UIBarButtonSystemItem.Done, EventHandler(fun _ _ ->
-            async {
-                updateProject ()
-                this.BeginInvokeOnMainThread (fun _ ->
-                    this.DismissViewController (true, null))
-            }
-            |> Async.Start))
-        sceneView.Delegate <- new CaptureViewDelegate ()
-        loadSubs <-
-            [|
-                captureButton.TouchUpInside.Subscribe (fun _ ->
-                    needsCapture <- true)
-            |]
-
-        //
         // Layout
         //
         let bounds = this.View.Bounds
@@ -155,15 +160,8 @@ type CaptureViewController (project : Project) =
         posLabel.Frame <- CGRect(nfloat 0.0, captureButton.Frame.Bottom, bounds.Width, buttonHeight * nfloat 0.5)
         posLabel.AutoresizingMask <- UIViewAutoresizing.FlexibleWidth ||| UIViewAutoresizing.FlexibleTopMargin
         this.View.AddSubview posLabel
+        [| |]
 
-        //
-        // Start session
-        //
-        match sceneView.Session with
-        | null -> printfn "NO ARKIT"
-        | session ->
-            session.Run (arConfig)
-            session.Delegate <- this
 
 
     interface IARSessionDelegate
@@ -185,8 +183,7 @@ type CaptureViewController (project : Project) =
             ())
         if needsCapture && canCapture then
             needsCapture <- false
-            numCapturedFrames <- numCapturedFrames + 1
-            let framePrefix = sprintf "Frame%d" numCapturedFrames
+            let framePrefix = sprintf "Frame%d" project.NewFrameIndex
             use capturedImage = frame.CapturedImage
             use sceneDepth = frame.SceneDepth
             let cameraResolution = frame.Camera.ImageResolution
@@ -206,41 +203,9 @@ type CaptureViewController (project : Project) =
             outputNMatrix4 framePrefix "Transform" cameraTransform
             outputNMatrix3 framePrefix "Intrinsics" cameraIntrinsics
             Threading.ThreadPool.QueueUserWorkItem(fun _ ->
-                this.PreviewCapture (depthPath)) |> ignore
-
-    member this.PreviewCapture (depthPath) : unit =
-        let frame = SdfFrame(depthPath, outputDir, 0.001f, 1.0f)
-        let pointCoords = frame.GetAllPoints ()
-        printfn "POINTS %A" pointCoords
-
-        let source = SCNGeometrySource.FromVertices(pointCoords)
-        let element =
-            use elemStream = new IO.MemoryStream ()
-            use elemWriter = new IO.BinaryWriter (elemStream)
-            for i in 0..(pointCoords.Length - 1) do
-                elemWriter.Write (i)
-            elemWriter.Flush ()
-            elemStream.Position <- 0L
-            let data = NSData.FromStream (elemStream)
-            SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Point, nint pointCoords.Length, nint 4)
-        let geometry = SCNGeometry.Create([|source|], [|element|])
-        let material = SCNMaterial.Create ()
-        material.Diffuse.ContentColor <- UIColor.SystemOrange
-        element.PointSize <- nfloat 0.01f
-        element.MinimumPointScreenSpaceRadius <- nfloat 1.0f
-        element.MaximumPointScreenSpaceRadius <- nfloat 5.0f
-        geometry.FirstMaterial <- material
-        let node = SCNNode.FromGeometry (geometry)
-        node.Opacity <- nfloat 0.75
-        SCNTransaction.Begin ()
-        let root = sceneView.Scene.RootNode
-        root.AddChildNode node
-        SCNTransaction.Commit ()
-        ()
-
-
-and CaptureViewDelegate () =
-    inherit ARSCNViewDelegate ()
+                let frame = SdfFrame (depthPath)
+                project.AddFrame frame
+                SceneUtils.addFrame frame sceneView) |> ignore
 
 
 

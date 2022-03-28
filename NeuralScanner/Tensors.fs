@@ -17,7 +17,7 @@ module MathOps =
 
 
 
-type SdfFrame (depthPath : string, dataDirectory : string, samplingDistance : float32, outputScale : float32) =
+type SdfFrame (depthPath : string) =
 
     let width, height, depths =
         let f = File.OpenRead (depthPath)
@@ -115,6 +115,8 @@ type SdfFrame (depthPath : string, dataDirectory : string, samplingDistance : fl
 
     let mutable inboundIndices = [||]
 
+    member this.DepthPath = depthPath
+
     member this.CenterPoint =
         let sx = width/2 - 1
         let ex = sx + 3
@@ -156,7 +158,7 @@ type SdfFrame (depthPath : string, dataDirectory : string, samplingDistance : fl
                     points.Add (SceneKit.SCNVector3(p.X, p.Y, p.Z))
         points.ToArray ()
 
-    member this.GetRow (inside: bool, poi : Vector3) : struct (Tensor[]*Tensor[]) =
+    member this.GetRow (inside: bool, poi : Vector3, samplingDistance : float32, outputScale : float32) : struct (Tensor[]*Tensor[]) =
         // i = y * width + x
         let index = inboundIndices.[StaticRandom.Next(inboundIndices.Length)]
         let x = index % width
@@ -182,40 +184,6 @@ type SdfFrame (depthPath : string, dataDirectory : string, samplingDistance : fl
                         Tensor.Array(freespaceShape, free)
                         Tensor.Array(distanceShape, outputSignedDistance) |]
         struct (inputs, [| |])
-
-type SdfDataSet (dataDirectory : string, samplingDistance : float32, outputScale : float32) =
-    inherit DataSet ()
-
-    let depthFiles = Directory.GetFiles (dataDirectory, "*_Depth.pixelbuffer")
-
-    let frames =
-        depthFiles
-        |> Array.map (fun x -> SdfFrame (x, dataDirectory, samplingDistance, outputScale))
-    let count = depthFiles |> Seq.sumBy (fun x -> 1)
-    do if count = 0 then failwithf "No files in %s" dataDirectory
-
-    let meanCenter =
-        if count > 0 then (frames |> Array.sumBy (fun x -> x.CenterPoint)) / float32 count
-        else Vector3.Zero
-    let volumeMin = meanCenter - 1.0f*Vector3.One // Vector3 (-0.30533359f, -1.12338264f, -0.89218203f)
-    let volumeMax = meanCenter + 1.0f*Vector3.One //Vector3 (0.69466641f, -0.62338264f, 0.10781797f)
-    let poi = meanCenter // (volumeMin + volumeMax) * 0.5f
-
-    do for f in frames do f.FindInBoundPoints(volumeMin, volumeMax)
-
-    member this.VolumeMin = volumeMin
-    member this.VolumeMax = volumeMax
-    member this.VolumeCenter = poi
-
-    override this.Count = frames |> Array.sumBy (fun x -> x.PointCount)
-
-    override this.GetRow (index, _) =
-        let inside = (index % 2) = 0
-        let fi = StaticRandom.Next(frames.Length)
-        let struct (i, o) = frames.[fi].GetRow (inside, poi)
-        //printfn "ROW%A D%A = %A" index inside i.[2].[0]
-        struct (i, o)
-
 
 
 

@@ -9,8 +9,10 @@ module ProjectDefaults =
 
 
 type Project (settings : ProjectSettings, projectDir : string) =
+    
+    let mutable captureFiles = Directory.GetFiles (projectDir, "*_Depth.pixelbuffer")
 
-    let mutable captureFiles = [| |]
+    let frames = System.Collections.Concurrent.ConcurrentDictionary<string, SdfFrame> ()
 
     let changed = Event<string> ()
 
@@ -18,6 +20,7 @@ type Project (settings : ProjectSettings, projectDir : string) =
 
     member this.ProjectDirectory = projectDir
     member this.CaptureDirectory = projectDir
+    member this.DepthPaths = captureFiles
 
     member this.Settings = settings
 
@@ -27,8 +30,17 @@ type Project (settings : ProjectSettings, projectDir : string) =
                                  changed.Trigger "Name"
 
     member this.NumCaptures = captureFiles.Length
+    member this.NewFrameIndex = this.NumCaptures
 
     override this.ToString () = sprintf "Project %s" this.Name
+
+    member this.GetFrame (depthPath : string) : SdfFrame =
+        frames.GetOrAdd (depthPath, fun x -> SdfFrame x)
+
+    member this.AddFrame (frame : SdfFrame) =
+        captureFiles <- Array.append captureFiles [| frame.DepthPath |]
+        frames.[frame.DepthPath] <- frame
+        changed.Trigger "NumCaptures"
 
     member this.UpdateCaptures () =
         captureFiles <- Directory.GetFiles (projectDir, "*_Depth.pixelbuffer")
@@ -95,6 +107,22 @@ module ProjectManager =
         |> Array.map loadProject
         |> Array.sortBy (fun x -> x.Name)
 
+//type ProjectFramesManager (project : Project) =
+//    let mutable depthPaths : string list =
+//        []
+//    member this.NewFrameIndex = depthPaths.Length
+//    member this.AddFrame (depthPath : string) =
+//        depthPaths <- depthPath :: depthPaths
 
-
-
+//module ProjectFramesManagers =
+//    let private services = System.Collections.Concurrent.ConcurrentDictionary<string, ProjectFramesManager> ()
+//    let getForProject (project : Project) : ProjectFramesManager =
+//        let key = project.ProjectDirectory
+//        match services.TryGetValue key with
+//        | true, x -> x
+//        | _ ->
+//            let s = ProjectFramesManager (project)
+//            if services.TryAdd (key, s) then
+//                s
+//            else
+//                services.[key]
