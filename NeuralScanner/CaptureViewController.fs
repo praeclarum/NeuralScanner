@@ -16,6 +16,8 @@ type CaptureViewController (project : Project) =
     let captureButton =
         let b = UIButton.FromType UIButtonType.RoundedRect
         b.SetTitle("Capture", UIControlState.Normal)
+        b.Enabled <- false
+        b.Alpha <- nfloat 0.5
         b
     let posLabel = new UILabel ()
     let sceneView = new ARSCNView()
@@ -25,6 +27,7 @@ type CaptureViewController (project : Project) =
     let arConfig =
         let semantics = if depthOK then depthSemantics else ARFrameSemantics.None
         new ARWorldTrackingConfiguration(FrameSemantics = semantics)
+    //do arConfig.InitialWorldMap <- initialMap
 
     let mutable needsCapture = false
 
@@ -121,12 +124,12 @@ type CaptureViewController (project : Project) =
             needsCapture <- true)
         this.View.AddSubview captureButton
 
-        posLabel.Frame <- CGRect(nfloat 0.0, captureButton.Frame.Top - buttonHeight, bounds.Width, buttonHeight)
+        posLabel.Frame <- CGRect(nfloat 0.0, captureButton.Frame.Bottom + nfloat 11.0, bounds.Width, buttonHeight)
         posLabel.AutoresizingMask <- UIViewAutoresizing.FlexibleWidth ||| UIViewAutoresizing.FlexibleTopMargin
         posLabel.BackgroundColor <- UIColor.SystemBackground.ColorWithAlpha(nfloat 0.1)
         posLabel.TextAlignment <- UITextAlignment.Center
         posLabel.Text <- "(0.000, 0.000, 0.000)"
-        posLabel.Font <- UIFont.SystemFontOfSize (nfloat 0.75 * buttonHeight)
+        posLabel.Font <- UIFont.SystemFontOfSize (nfloat 0.5 * buttonHeight)
         this.View.AddSubview posLabel
         
         match sceneView.Session with
@@ -145,10 +148,16 @@ type CaptureViewController (project : Project) =
         let cameraTransform = frame.Camera.Transform
         let cameraPosition = cameraTransform.Column3.Xyz
         let posString = sprintf "(%.3f, %.3f, %.3f)" cameraPosition.X cameraPosition.Y cameraPosition.Z
+        let canCapture =
+            true
+            || frame.WorldMappingStatus = ARWorldMappingStatus.Mapped
+            || frame.WorldMappingStatus = ARWorldMappingStatus.Extending
         this.BeginInvokeOnMainThread (fun () ->
             posLabel.Text <- posString
+            captureButton.Enabled <- canCapture
+            captureButton.Alpha <- nfloat (if canCapture then 1.0 else 0.5)
             ())
-        if needsCapture then
+        if needsCapture && canCapture then
             needsCapture <- false
             numCapturedFrames <- numCapturedFrames + 1
             let framePrefix = sprintf "Frame%d" numCapturedFrames
