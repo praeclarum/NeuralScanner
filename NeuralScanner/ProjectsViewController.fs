@@ -66,7 +66,9 @@ type ProjectsViewController () =
 
     member private this.RefreshProjects () =
         async {
-            let newProjects = ProjectManager.findProjects ()
+            let newProjects =
+                ProjectManager.findProjects ()
+                |> Array.sortByDescending (fun x -> x.ModifiedUtc)
             
             this.BeginInvokeOnMainThread (fun () ->
                 projects <- newProjects
@@ -105,6 +107,6 @@ and ProjectCell () =
         | None -> ()
         | Some project ->
             this.TextLabel.Text <- project.Name
-            this.DetailTextLabel.Text <- sprintf "%d scans" project.NumCaptures
+            this.DetailTextLabel.Text <- sprintf "%s — %d scans" (project.ModifiedUtc.ToShortDateString()) project.NumCaptures
 
 

@@ -148,7 +148,7 @@ type SdfFrame (depthPath : string) =
             material.ReadsFromDepthBuffer <- false
             material.WritesToDepthBuffer <- true
             element.PointSize <- nfloat 0.01f
-            element.MinimumPointScreenSpaceRadius <- nfloat 1.0f
+            element.MinimumPointScreenSpaceRadius <- nfloat 0.1f
             element.MaximumPointScreenSpaceRadius <- nfloat 5.0f
             geometry.FirstMaterial <- material
             geometry

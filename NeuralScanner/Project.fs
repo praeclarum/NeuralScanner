@@ -16,6 +16,8 @@ type Project (settings : ProjectSettings, projectDir : string) =
 
     let changed = Event<string> ()
 
+    member this.ModifiedUtc = settings.ModifiedUtc
+
     member this.Changed = changed.Publish
 
     member this.ProjectDirectory = projectDir
@@ -25,14 +27,17 @@ type Project (settings : ProjectSettings, projectDir : string) =
     member this.Settings = settings
 
     member this.Name with get () = this.Settings.Name
-                     and set v = this.Settings.Name <- v
-                                 this.Save ()
-                                 changed.Trigger "Name"
+                     and set v = this.Settings.Name <- v; this.SetModified "Name"
 
     member this.NumCaptures = captureFiles.Length
     member this.NewFrameIndex = this.NumCaptures
 
     override this.ToString () = sprintf "Project %s" this.Name
+
+    member private this.SetModified (property : string) =
+        this.Settings.ModifiedUtc <- DateTime.UtcNow
+        this.Save ()
+        changed.Trigger property
 
     member this.GetFrame (depthPath : string) : SdfFrame =
         frames.GetOrAdd (depthPath, fun x -> SdfFrame x)
@@ -55,14 +60,15 @@ type Project (settings : ProjectSettings, projectDir : string) =
         ()
 
 
-and ProjectSettings (initialName : string, initialLearningRate : float32) =
+and ProjectSettings (name : string, learningRate : float32, modifiedUtc : DateTime) =
     inherit Configurable ()
 
-    member val Name = initialName with get, set
-    member val LearningRate = initialLearningRate with get, set
+    member val Name = name with get, set
+    member val LearningRate = learningRate with get, set
+    member val ModifiedUtc = modifiedUtc with get, set
 
     override this.Config =
-        base.Config.Add("initialName", this.Name).Add("initialLearningRate", this.LearningRate)
+        base.Config.Add("name", this.Name).Add("learningRate", this.LearningRate).Add("modifiedUtc", this.ModifiedUtc)
 
 
 module ProjectManager =
@@ -85,10 +91,10 @@ module ProjectManager =
                     Config.Read<ProjectSettings> (settingsPath)
                 with
                 | :? System.IO.FileNotFoundException ->
-                    ProjectSettings ("Untitled", ProjectDefaults.learningRate)
+                    ProjectSettings ("Untitled", ProjectDefaults.learningRate, DateTime.UtcNow)
                 | ex ->
                     printfn "LOAD ERROR: %O" ex
-                    ProjectSettings ("Untitled", ProjectDefaults.learningRate)
+                    ProjectSettings ("Untitled", ProjectDefaults.learningRate, DateTime.UtcNow)
             let project = Project (settings, projectDir)
             project.UpdateCaptures ()
             loadedProjects <- loadedProjects.Add (projectDir, project)
