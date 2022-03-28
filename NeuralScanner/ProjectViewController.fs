@@ -103,34 +103,10 @@ type ProjectViewController (project : Project) =
         this.View.AddSubview (stackView)
         this.View.AddConstraints
             [|
-                NSLayoutConstraint.Create(this.View.SafeAreaLayoutGuide,
-                                          NSLayoutAttribute.Left,
-                                          NSLayoutRelation.Equal,
-                                          stackView,
-                                          NSLayoutAttribute.Left,
-                                          nfloat 1.0,
-                                          nfloat 0.0)
-                NSLayoutConstraint.Create(this.View.SafeAreaLayoutGuide,
-                                          NSLayoutAttribute.Top,
-                                          NSLayoutRelation.Equal,
-                                          stackView,
-                                          NSLayoutAttribute.Top,
-                                          nfloat 1.0,
-                                          nfloat 0.0)
-                NSLayoutConstraint.Create(this.View.SafeAreaLayoutGuide,
-                                          NSLayoutAttribute.Right,
-                                          NSLayoutRelation.Equal,
-                                          stackView,
-                                          NSLayoutAttribute.Right,
-                                          nfloat 1.0,
-                                          nfloat 0.0)
-                NSLayoutConstraint.Create(this.View.SafeAreaLayoutGuide,
-                                          NSLayoutAttribute.Bottom,
-                                          NSLayoutRelation.Equal,
-                                          stackView,
-                                          NSLayoutAttribute.Bottom,
-                                          nfloat 1.0,
-                                          nfloat 0.0)
+                this.View.SafeAreaLayoutGuide.LayoutTop == stackView.LayoutTop
+                this.View.SafeAreaLayoutGuide.LayoutBottom == stackView.LayoutBottom
+                this.View.SafeAreaLayoutGuide.LayoutLeft == stackView.LayoutLeft
+                this.View.SafeAreaLayoutGuide.LayoutRight == stackView.LayoutRight
             |]
 
 

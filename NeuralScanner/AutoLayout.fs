@@ -19,7 +19,7 @@ type NativeView = NSView
 /// Use @@ to set the priority of the constraint (1000 is the default).
 type LayoutRef =
     {
-        View : NativeView
+        View : NSObject
         Attribute : NSLayoutAttribute
         M : nfloat
         C : nfloat
@@ -109,3 +109,15 @@ type NSView with
     member this.LayoutWidth = { View = this; Attribute = NSLayoutAttribute.Width; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
 
         
+type UILayoutGuide with
+    member this.LayoutBaseline = { View = this; Attribute = NSLayoutAttribute.Baseline; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
+    member this.LayoutBottom = { View = this; Attribute = NSLayoutAttribute.Bottom; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
+    member this.LayoutCenterX = { View = this; Attribute = NSLayoutAttribute.CenterX; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
+    member this.LayoutCenterY = { View = this; Attribute = NSLayoutAttribute.CenterY; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
+    member this.LayoutHeight = { View = this; Attribute = NSLayoutAttribute.Height; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
+    member this.LayoutLeading = { View = this; Attribute = NSLayoutAttribute.Leading; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
+    member this.LayoutLeft = { View = this; Attribute = NSLayoutAttribute.Left; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
+    member this.LayoutRight = { View = this; Attribute = NSLayoutAttribute.Right; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
+    member this.LayoutTop = { View = this; Attribute = NSLayoutAttribute.Top; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
+    member this.LayoutTrailing = { View = this; Attribute = NSLayoutAttribute.Trailing; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
+    member this.LayoutWidth = { View = this; Attribute = NSLayoutAttribute.Width; M = nfloat 1.0; C = nfloat 0.0; P = 1000.0f }
