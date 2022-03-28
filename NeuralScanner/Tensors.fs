@@ -143,13 +143,12 @@ type SdfFrame (depthPath : string) =
                 let data = NSData.FromStream (elemStream)
                 SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Point, nint pointCoords.Length, nint 4)
             let geometry = SCNGeometry.Create([|source|], [|element|])
-            let material = SCNMaterial.Create ()
-            material.Diffuse.ContentColor <- UIColor.White
-            material.ReadsFromDepthBuffer <- false
-            material.WritesToDepthBuffer <- true
             element.PointSize <- nfloat 0.01f
             element.MinimumPointScreenSpaceRadius <- nfloat 0.1f
             element.MaximumPointScreenSpaceRadius <- nfloat 5.0f
+            let material = SCNMaterial.Create ()
+            material.ReadsFromDepthBuffer <- true
+            material.WritesToDepthBuffer <- true
             geometry.FirstMaterial <- material
             geometry
 
@@ -217,7 +216,7 @@ type SdfFrame (depthPath : string) =
     member this.CreatePointNode (color : UIColor) =
         let g = pointGeometry.Value.Copy (NSZone.Default) :?> SCNGeometry
         let m = g.FirstMaterial.Copy (NSZone.Default) :?> SCNMaterial
-        m.Diffuse.ContentColor <- color
+        m.Emission.ContentColor <- color
         g.FirstMaterial <- m
         let node = SCNNode.FromGeometry g
         node

@@ -20,6 +20,8 @@ type ProjectViewController (project : Project) =
     // UI
     let sceneView = new SCNView (UIScreen.MainScreen.Bounds,
                                  BackgroundColor = UIColor.SystemBackground)
+    do sceneView.AutoenablesDefaultLighting <- true
+
     let lossView = new LossGraphView ()
     do lossView.SetLosses (trainingService.Losses)
 
@@ -130,6 +132,7 @@ type ProjectViewController (project : Project) =
                 this.UpdateUI ())
             pauseTrainButton.TouchUpInside.Subscribe (fun _ ->
                 trainingService.Pause ()
+                this.GeneratePreviewMesh ()
                 this.UpdateUI ())
         |]
 
@@ -145,5 +148,34 @@ type ProjectViewController (project : Project) =
             ()
         SCNTransaction.Commit ()
 
-
+    member this.GeneratePreviewMesh () =
+        Threading.ThreadPool.QueueUserWorkItem (fun _ ->
+            let mesh = trainingService.GenerateMesh ()
+            let vertsSource =
+                mesh.Vertices
+                |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))
+                |> SCNGeometrySource.FromVertices
+            let normsSource =
+                mesh.Normals
+                |> Array.map (fun v -> SCNVector3(-v.X, -v.Y, -v.Z))
+                |> SCNGeometrySource.FromNormals
+            let element =
+                let elemStream = new IO.MemoryStream ()
+                let elemWriter = new IO.BinaryWriter (elemStream)
+                for i in 0..(mesh.Triangles.Length - 1) do
+                    elemWriter.Write (mesh.Triangles.[i])
+                elemWriter.Flush ()
+                elemStream.Position <- 0L
+                let data = NSData.FromStream (elemStream)
+                SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Triangles, nint (mesh.Triangles.Length / 3), nint 4)
+            let geometry = SCNGeometry.Create([|vertsSource;normsSource|], [|element|])
+            let material = SCNMaterial.Create ()
+            material.Diffuse.ContentColor <- UIColor.White
+            geometry.FirstMaterial <- material
+            let node = SCNNode.FromGeometry(geometry)
+            SCNTransaction.Begin ()
+            rootNode.AddChildNode node
+            SCNTransaction.Commit ()
+            ())
+        |> ignore
 
