@@ -33,6 +33,14 @@ type LossGraphView () =
     override this.IntrinsicContentSize =
         CGSize (320.0f, 200.0f)
 
+    member this.SetLosses(loss : float32[]) =
+        if loss.Length > 0 then
+            this.BeginInvokeOnMainThread (fun _ ->
+                losses.Clear ()
+                losses.AddRange (loss)
+                this.SetNeedsDisplay ()
+                valueLabel.Text <- sprintf "%.5f %.1f%%" loss.[loss.Length - 1] 0.0)
+
     member this.AddLoss (progress : float32, loss : float32) =
         this.BeginInvokeOnMainThread (fun _ ->
             progressView.Progress <- float32 progress

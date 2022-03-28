@@ -11,8 +11,9 @@ open Praeclarum.AutoLayout
 type ProjectViewController (project : Project) =
     inherit UIViewController (Title = "Project")
 
-    let trainingService = TrainingService (project)
+    let trainingService = TrainingServices.getForProject (project)
     let lossView = new LossGraphView ()
+    do lossView.SetLosses (trainingService.Losses)
 
     let captureButton = UIButton.FromType(UIButtonType.RoundedRect)
     do

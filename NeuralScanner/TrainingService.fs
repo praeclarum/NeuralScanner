@@ -2,6 +2,7 @@
 
 open System
 open System.Runtime.InteropServices
+open System.Collections.Concurrent
 open System.IO
 open System.Numerics
 open System.Globalization
@@ -100,6 +101,10 @@ type TrainingService (project : Project) =
 
     let mutable trainedPoints = 0
 
+    let losses = ResizeArray<float32> ()
+
+    member this.Losses = losses.ToArray ()
+
     member this.BatchTrained = batchTrained.Publish
 
     member this.Train () =
@@ -114,7 +119,9 @@ type TrainingService (project : Project) =
             //printfn "LOSS %g" h.AverageLoss
             totalTrained <- batchSize + totalTrained
             let progress = float32 totalTrained / float32 (numEpochs * data.Count)
-            batchTrained.Trigger (progress, totalTrained, h.AverageLoss)
+            let loss = h.AverageLoss
+            losses.Add (loss)
+            batchTrained.Trigger (progress, totalTrained, loss)
             ()
         for epoch in 0..(numEpochs-1) do
             let history = trainingModel.Fit(data, batchSize = batchSize, epochs = 1.0f, callback = fun h -> callback h)
@@ -177,6 +184,17 @@ type TrainingService (project : Project) =
             changed.Trigger "IsTraining"
 
 
-
+module TrainingServices =
+    let private services = ConcurrentDictionary<string, TrainingService> ()
+    let getForProject (project : Project) : TrainingService =
+        let key = project.ProjectDirectory
+        match services.TryGetValue key with
+        | true, x -> x
+        | _ ->
+            let s = TrainingService (project)
+            if services.TryAdd (key, s) then
+                s
+            else
+                services.[key]
 
 

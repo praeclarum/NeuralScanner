@@ -38,8 +38,9 @@ type Project (settings : ProjectSettings, projectDir : string) =
         let settingsPath = Path.Combine (projectDir, "Settings.xml")
         printfn "SAVE TO: %s" settingsPath
         this.Settings.Save (settingsPath)
-        let fileOutput = IO.File.ReadAllText(settingsPath)
-        printfn "FILE:\n%s" fileOutput
+        //let fileOutput = IO.File.ReadAllText(settingsPath)
+        //printfn "FILE:\n%s" fileOutput
+        ()
 
 
 and ProjectSettings (initialName : string, initialLearningRate : float32) =
@@ -68,9 +69,12 @@ module ProjectManager =
             let settingsPath = Path.Combine (projectDir, "Settings.xml")
             let settings =
                 try
-                    printfn "LOAD FROM: %s" settingsPath
+                    //printfn "LOAD FROM: %s" settingsPath
                     Config.Read<ProjectSettings> (settingsPath)
-                with ex ->
+                with
+                | :? System.IO.FileNotFoundException ->
+                    ProjectSettings ("Untitled", ProjectDefaults.learningRate)
+                | ex ->
                     printfn "LOAD ERROR: %O" ex
                     ProjectSettings ("Untitled", ProjectDefaults.learningRate)
             let project = Project (settings, projectDir)
