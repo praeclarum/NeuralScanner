@@ -6,7 +6,10 @@ open System.IO
 open System.Numerics
 open System.Globalization
 
+open Foundation
 open MetalTensors
+open SceneKit
+open UIKit
 
 [<AutoOpen>]
 module MathOps =
@@ -115,6 +118,41 @@ type SdfFrame (depthPath : string) =
 
     let mutable inboundIndices = [||]
 
+    let pointCoords =
+        lazy
+            let points = ResizeArray<SceneKit.SCNVector3>()
+            for x in 0..(width-1) do
+                for y in 0..(height-1) do
+                    let i = index x y
+                    if confidences.[i] > 0uy then
+                        let p = worldPosition x y 0.0f
+                        points.Add (SceneKit.SCNVector3(p.X, p.Y, p.Z))
+            points.ToArray ()
+
+    let pointGeometry =
+        lazy
+            let pointCoords = pointCoords.Value
+            let source = SCNGeometrySource.FromVertices(pointCoords)
+            let element =
+                let elemStream = new IO.MemoryStream ()
+                let elemWriter = new IO.BinaryWriter (elemStream)
+                for i in 0..(pointCoords.Length - 1) do
+                    elemWriter.Write (i)
+                elemWriter.Flush ()
+                elemStream.Position <- 0L
+                let data = NSData.FromStream (elemStream)
+                SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Point, nint pointCoords.Length, nint 4)
+            let geometry = SCNGeometry.Create([|source|], [|element|])
+            let material = SCNMaterial.Create ()
+            material.Diffuse.ContentColor <- UIColor.White
+            material.ReadsFromDepthBuffer <- false
+            material.WritesToDepthBuffer <- true
+            element.PointSize <- nfloat 0.01f
+            element.MinimumPointScreenSpaceRadius <- nfloat 1.0f
+            element.MaximumPointScreenSpaceRadius <- nfloat 5.0f
+            geometry.FirstMaterial <- material
+            geometry
+
     member this.DepthPath = depthPath
 
     member this.CenterPoint =
@@ -148,16 +186,6 @@ type SdfFrame (depthPath : string) =
 
     member this.PointCount = inboundIndices.Length
 
-    member this.GetAllPoints () : SceneKit.SCNVector3[] =
-        let points = ResizeArray<SceneKit.SCNVector3>()
-        for x in 0..(width-1) do
-            for y in 0..(height-1) do
-                let i = index x y
-                if confidences.[i] > 0uy then
-                    let p = worldPosition x y 0.0f
-                    points.Add (SceneKit.SCNVector3(p.X, p.Y, p.Z))
-        points.ToArray ()
-
     member this.GetRow (inside: bool, poi : Vector3, samplingDistance : float32, outputScale : float32) : struct (Tensor[]*Tensor[]) =
         // i = y * width + x
         let index = inboundIndices.[StaticRandom.Next(inboundIndices.Length)]
@@ -185,7 +213,14 @@ type SdfFrame (depthPath : string) =
                         Tensor.Array(distanceShape, outputSignedDistance) |]
         struct (inputs, [| |])
 
-
+    member this.GetPointGeometry () = pointGeometry.Value
+    member this.CreatePointNode (color : UIColor) =
+        let g = pointGeometry.Value.Copy (NSZone.Default) :?> SCNGeometry
+        let m = g.FirstMaterial.Copy (NSZone.Default) :?> SCNMaterial
+        m.Diffuse.ContentColor <- color
+        g.FirstMaterial <- m
+        let node = SCNNode.FromGeometry g
+        node
 
 
 

@@ -205,7 +205,12 @@ type CaptureViewController (project : Project) =
             Threading.ThreadPool.QueueUserWorkItem(fun _ ->
                 let frame = SdfFrame (depthPath)
                 project.AddFrame frame
-                SceneUtils.addFrame frame sceneView) |> ignore
+                let n = frame.CreatePointNode (UIColor.SystemGreen)
+                n.Opacity <- nfloat 0.5
+                SCNTransaction.Begin ()
+                let root = sceneView.Scene.RootNode
+                root.AddChildNode n
+                SCNTransaction.Commit ()) |> ignore
 
 
 

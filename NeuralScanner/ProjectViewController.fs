@@ -2,6 +2,8 @@
 
 
 open System
+open System.Collections.Concurrent
+
 open Foundation
 open UIKit
 open SceneKit
@@ -17,7 +19,7 @@ type ProjectViewController (project : Project) =
 
     // UI
     let sceneView = new SCNView (UIScreen.MainScreen.Bounds,
-                                 BackgroundColor = UIColor.SystemRed)
+                                 BackgroundColor = UIColor.SystemBackground)
     let lossView = new LossGraphView ()
     do lossView.SetLosses (trainingService.Losses)
 
@@ -25,6 +27,10 @@ type ProjectViewController (project : Project) =
     do
         captureButton.SetTitle("Scan Object", UIControlState.Normal)
         captureButton.SetImage(UIImage.GetSystemImage "viewfinder", UIControlState.Normal)
+    let labelCaptureInfo = new UILabel (Text = "Object not scanned")
+    let capturePanel = new UIStackView (Axis = UILayoutConstraintAxis.Horizontal, Spacing = nfloat 44.0)
+    do capturePanel.AddArrangedSubview (captureButton)
+    do capturePanel.AddArrangedSubview (labelCaptureInfo)
 
     let trainButton = UIButton.FromType(UIButtonType.RoundedRect)
     let pauseTrainButton = UIButton.FromType(UIButtonType.RoundedRect)
@@ -33,16 +39,17 @@ type ProjectViewController (project : Project) =
         trainButton.TouchUpInside.Add (fun _ -> trainingService.Run ())
         pauseTrainButton.SetTitle("Pause Training", UIControlState.Normal)
         pauseTrainButton.TouchUpInside.Add (fun _ -> trainingService.Pause ())
-    let trainButtons = new UIStackView (Axis = UILayoutConstraintAxis.Horizontal)
-    do trainButtons.AddArrangedSubview (trainButton)
-    do trainButtons.AddArrangedSubview (pauseTrainButton)
-    do trainButtons.Spacing <- nfloat 44.0
-
+    let trainButtons = new UIStackView (Axis = UILayoutConstraintAxis.Horizontal, Spacing = nfloat 44.0)
+    do trainButtons.AddArrangedSubview trainButton
+    do trainButtons.AddArrangedSubview pauseTrainButton
     let nameField = new UITextField (Placeholder = "Name", Text = project.Name)
 
-    let labelCaptureInfo = new UILabel (Text = "Object not scanned")
-
-    let stackView = new UIStackView (Axis = UILayoutConstraintAxis.Vertical)
+    let scene = SCNScene.Create()
+    do sceneView.Scene <- scene
+    let rootNode = scene.RootNode
+    let pointCloudNode = new SCNNode (Name = "PointCloud")
+    do rootNode.AddChildNode pointCloudNode
+    let framePointNodes = ConcurrentDictionary<string, SCNNode> ()
 
     member this.HandleCapture () =
         let captureVC = new CaptureViewController (project)
@@ -55,40 +62,37 @@ type ProjectViewController (project : Project) =
         base.ViewDidLoad ()
 
     override this.AddUI view =
-        //
-        // Layout
-        //
-        stackView.Frame <- this.View.Bounds
-        stackView.Alignment <- UIStackViewAlignment.Center
-        stackView.Distribution <- UIStackViewDistribution.EqualSpacing
-
-        stackView.TranslatesAutoresizingMaskIntoConstraints <- false
-        stackView.AddArrangedSubview (nameField)
-        stackView.AddArrangedSubview (labelCaptureInfo)
-        stackView.AddArrangedSubview (captureButton)
-        //stackView.AddArrangedSubview (lossView)
-        stackView.AddArrangedSubview (trainButtons)
-        stackView.AddArrangedSubview (new UIView ())
+        capturePanel.TranslatesAutoresizingMaskIntoConstraints <- false
 
         sceneView.Frame <- this.View.Bounds
         sceneView.AutoresizingMask <- UIViewAutoresizing.FlexibleDimensions
+        sceneView.AllowsCameraControl <- true
 
         lossView.TranslatesAutoresizingMaskIntoConstraints <- false
 
-        let view = this.View
+        nameField.TextAlignment <- UITextAlignment.Center
+        nameField.TranslatesAutoresizingMaskIntoConstraints <- false
+
+        trainButtons.TranslatesAutoresizingMaskIntoConstraints <- false
+
         view.AddSubview (sceneView)
-        view.AddSubview (stackView)
         view.AddSubview (lossView)
+        view.AddSubview nameField
+        view.AddSubview trainButtons
+        view.AddSubview capturePanel
 
         [|
-            view.SafeAreaLayoutGuide.LayoutTop == stackView.LayoutTop
-            view.SafeAreaLayoutGuide.LayoutLeft == stackView.LayoutLeft
-            view.SafeAreaLayoutGuide.LayoutRight == stackView.LayoutRight
-            view.SafeAreaLayoutGuide.LayoutBottom == stackView.LayoutBottom
+            nameField.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
+            nameField.LayoutLeading == view.SafeAreaLayoutGuide.LayoutLeading
+            nameField.LayoutTrailing == view.SafeAreaLayoutGuide.LayoutTrailing
             lossView.LayoutLeft == view.LayoutLeft
             lossView.LayoutRight == view.LayoutRight
             lossView.LayoutBottom == view.LayoutBottom
             lossView.LayoutTop == view.SafeAreaLayoutGuide.LayoutBottom - 128.0
+            trainButtons.LayoutCenterX == lossView.LayoutCenterX
+            trainButtons.LayoutBottom == lossView.LayoutTop
+            capturePanel.LayoutCenterX == lossView.LayoutCenterX
+            capturePanel.LayoutBottom == trainButtons.LayoutTop - 22.0
         |]
 
     override this.UpdateUI () =
@@ -100,9 +104,9 @@ type ProjectViewController (project : Project) =
             trainButton.Enabled <- false
             pauseTrainButton.Enabled <- true
         else
-            trainButton.Enabled <- true
+            trainButton.Enabled <- project.NumCaptures > 0
             pauseTrainButton.Enabled <- false
-        ()
+        Threading.ThreadPool.QueueUserWorkItem (fun _ -> this.UpdatePointCloud ()) |> ignore
 
     override this.SubscribeUI () =
         nameField.ShouldReturn <- fun x -> x.ResignFirstResponder() |> ignore; false
@@ -129,7 +133,17 @@ type ProjectViewController (project : Project) =
                 this.UpdateUI ())
         |]
 
-
+    member this.UpdatePointCloud () =
+        SCNTransaction.Begin ()
+        for fi in project.DepthPaths do
+            let node = framePointNodes.GetOrAdd (fi, fun fi ->
+                let f = project.GetFrame fi
+                let n = f.CreatePointNode (UIColor.SystemOrange)
+                n.Opacity <- nfloat 0.125
+                pointCloudNode.AddChildNode n
+                n)
+            ()
+        SCNTransaction.Commit ()
 
 
 
