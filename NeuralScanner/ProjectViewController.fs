@@ -4,20 +4,27 @@
 open System
 open Foundation
 open UIKit
+open SceneKit
 
 open Praeclarum.AutoLayout
 
 
 type ProjectViewController (project : Project) =
-    inherit UIViewController (Title = "Project")
+    inherit UIViewController ()
 
+    // Services
     let trainingService = TrainingServices.getForProject (project)
+
+    // UI
+    let sceneView = new SCNView (UIScreen.MainScreen.Bounds,
+                                 BackgroundColor = UIColor.SystemRed)
     let lossView = new LossGraphView ()
     do lossView.SetLosses (trainingService.Losses)
 
     let captureButton = UIButton.FromType(UIButtonType.RoundedRect)
     do
         captureButton.SetTitle("Scan Object", UIControlState.Normal)
+        captureButton.SetImage(UIImage.GetSystemImage "viewfinder", UIControlState.Normal)
 
     let trainButton = UIButton.FromType(UIButtonType.RoundedRect)
     let pauseTrainButton = UIButton.FromType(UIButtonType.RoundedRect)
@@ -35,8 +42,9 @@ type ProjectViewController (project : Project) =
 
     let labelCaptureInfo = new UILabel (Text = "Object not scanned")
 
-    let stackView = new UIStackView ()
-    do stackView.Axis <- UILayoutConstraintAxis.Vertical
+    let stackView = new UIStackView (Axis = UILayoutConstraintAxis.Vertical)
+
+    let mutable loadSubs : IDisposable[] = Array.empty
 
     member this.HandleCapture () =
         let captureVC = new CaptureViewController (project)
@@ -61,34 +69,40 @@ type ProjectViewController (project : Project) =
     override this.ViewDidLoad () =
         base.ViewDidLoad ()
 
-        project.Changed.Add (fun _ ->
-            this.BeginInvokeOnMainThread (fun _ ->
-                this.UpdateUI ()))
-        trainingService.Changed.Add (fun _ ->
-            this.BeginInvokeOnMainThread (fun _ ->
-                this.UpdateUI ()))
-        trainingService.BatchTrained.Add (fun (progress, totalTrained, loss) ->
-            this.BeginInvokeOnMainThread (fun _ ->
-                lossView.AddLoss (progress, loss)))
-        this.UpdateUI ()
-
-        nameField.ValueChanged.Add (fun _ ->
-            project.Name <- nameField.Text)
-        nameField.EditingChanged.Add (fun _ ->
-            project.Name <- nameField.Text)
-
-        captureButton.TouchUpInside.Add(fun _ -> this.HandleCapture())
-        trainButton.TouchUpInside.Add (fun _ ->
-            trainingService.Run ()
-            this.UpdateUI ())
-        pauseTrainButton.TouchUpInside.Add (fun _ ->
-            trainingService.Pause ()
-            this.UpdateUI ())
-
         this.View.BackgroundColor <- UIColor.SystemBackground
 
+        //
+        // Subscribe to events
+        //
+        loadSubs <-
+            [|
+                project.Changed.Subscribe (fun _ ->
+                    this.BeginInvokeOnMainThread (fun _ ->
+                        this.UpdateUI ()))
+                trainingService.Changed.Subscribe (fun _ ->
+                    this.BeginInvokeOnMainThread (fun _ ->
+                        this.UpdateUI ()))
+                trainingService.BatchTrained.Subscribe (fun (progress, totalTrained, loss) ->
+                    this.BeginInvokeOnMainThread (fun _ ->
+                        lossView.AddLoss (progress, loss)))
+
+                nameField.EditingChanged.Subscribe (fun _ ->
+                    project.Name <- nameField.Text)
+
+                captureButton.TouchUpInside.Subscribe(fun _ -> this.HandleCapture())
+                trainButton.TouchUpInside.Subscribe (fun _ ->
+                    trainingService.Run ()
+                    this.UpdateUI ())
+                pauseTrainButton.TouchUpInside.Subscribe (fun _ ->
+                    trainingService.Pause ()
+                    this.UpdateUI ())
+            |]
+        this.UpdateUI ()
+
+        //
+        // Layout
+        //
         stackView.Frame <- this.View.Bounds
-        stackView.AutoresizingMask <- UIViewAutoresizing.FlexibleDimensions
         stackView.Alignment <- UIStackViewAlignment.Center
         stackView.Distribution <- UIStackViewDistribution.EqualSpacing
 
@@ -100,6 +114,10 @@ type ProjectViewController (project : Project) =
         stackView.AddArrangedSubview (trainButtons)
         stackView.AddArrangedSubview (new UIView ())
 
+        sceneView.Frame <- this.View.Bounds
+        sceneView.AutoresizingMask <- UIViewAutoresizing.FlexibleDimensions
+
+        this.View.AddSubview (sceneView)
         this.View.AddSubview (stackView)
         this.View.AddConstraints
             [|
@@ -108,6 +126,14 @@ type ProjectViewController (project : Project) =
                 this.View.SafeAreaLayoutGuide.LayoutLeft == stackView.LayoutLeft
                 this.View.SafeAreaLayoutGuide.LayoutRight == stackView.LayoutRight
             |]
+
+    // This VC is going to be tossed out
+    member this.Stop () =
+        let subs = loadSubs
+        loadSubs <- Array.empty
+        for s in subs do
+            s.Dispose ()
+        ()
 
 
 

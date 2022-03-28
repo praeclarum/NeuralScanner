@@ -97,6 +97,8 @@ type CaptureViewController (project : Project) =
 
     let mutable numCapturedFrames = 0
 
+    let mutable loadSubs : IDisposable[] = Array.empty
+
     let updateProject () =
         project.UpdateCaptures ()
         ()
@@ -107,6 +109,25 @@ type CaptureViewController (project : Project) =
     override this.ViewDidLoad () =
         base.ViewDidLoad ()
 
+        this.View.BackgroundColor <- UIColor.SystemGray
+
+        let fontHeight = nfloat 32.0
+        captureButton.BackgroundColor <- UIColor.SystemOrange
+        captureButton.Font <- UIFont.SystemFontOfSize (fontHeight)
+        captureButton.SetImage(UIImage.GetSystemImage "camera.fill", UIControlState.Normal)
+        captureButton.TintColor <- UIColor.White
+
+        posLabel.BackgroundColor <- UIColor.Clear
+        posLabel.TextColor <- UIColor.FromWhiteAlpha (nfloat 1.0, nfloat 0.75f)
+        posLabel.ShadowColor <- UIColor.FromWhiteAlpha (nfloat 0.0, nfloat 0.75f)
+        posLabel.ShadowOffset <- CGSize (2.0, 2.0)
+        posLabel.TextAlignment <- UITextAlignment.Center
+        posLabel.Text <- "(0.000, 0.000, 0.000)"
+        posLabel.Font <- UIFont.SystemFontOfSize (fontHeight)
+
+        //
+        // Events
+        //
         this.NavigationItem.RightBarButtonItem <- new UIBarButtonItem(UIBarButtonSystemItem.Done, EventHandler(fun _ _ ->
             async {
                 updateProject ()
@@ -114,31 +135,36 @@ type CaptureViewController (project : Project) =
                     this.DismissViewController (true, null))
             }
             |> Async.Start))
+        loadSubs <-
+            [|
+                captureButton.TouchUpInside.Subscribe (fun _ ->
+                    needsCapture <- true)
+            |]
+        sceneView.Delegate <- new CaptureViewDelegate ()
 
+        //
+        // Layout
+        //
         let bounds = this.View.Bounds
         let buttonHeight = nfloat 88.0
-        captureButton.Frame <- CGRect(nfloat 0.0, bounds.Height - buttonHeight - nfloat 128.0, bounds.Width, buttonHeight)
-        captureButton.AutoresizingMask <- UIViewAutoresizing.FlexibleWidth ||| UIViewAutoresizing.FlexibleTopMargin
-        captureButton.BackgroundColor <- UIColor.SystemOrange
-        captureButton.TouchUpInside.Add (fun _ ->
-            needsCapture <- true)
-        this.View.AddSubview captureButton
 
-        posLabel.Frame <- CGRect(nfloat 0.0, captureButton.Frame.Bottom + nfloat 11.0, bounds.Width, buttonHeight)
+        this.View.AddSubview captureButton
+        captureButton.Frame <- CGRect(nfloat 0.0, bounds.Height - buttonHeight * nfloat 1.5, bounds.Width, buttonHeight)
+        captureButton.AutoresizingMask <- UIViewAutoresizing.FlexibleWidth ||| UIViewAutoresizing.FlexibleTopMargin
+
+        posLabel.Frame <- CGRect(nfloat 0.0, captureButton.Frame.Bottom, bounds.Width, buttonHeight * nfloat 0.5)
         posLabel.AutoresizingMask <- UIViewAutoresizing.FlexibleWidth ||| UIViewAutoresizing.FlexibleTopMargin
-        posLabel.BackgroundColor <- UIColor.SystemBackground.ColorWithAlpha(nfloat 0.1)
-        posLabel.TextAlignment <- UITextAlignment.Center
-        posLabel.Text <- "(0.000, 0.000, 0.000)"
-        posLabel.Font <- UIFont.SystemFontOfSize (nfloat 0.5 * buttonHeight)
         this.View.AddSubview posLabel
-        
+
+        //
+        // Start session
+        //
         match sceneView.Session with
         | null -> printfn "NO ARKIT"
         | session ->
             session.Run (arConfig)
             session.Delegate <- this
 
-        sceneView.Delegate <- new CaptureViewDelegate ()
 
     interface IARSessionDelegate
 
@@ -199,7 +225,7 @@ type CaptureViewController (project : Project) =
             SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Point, nint pointCoords.Length, nint 4)
         let geometry = SCNGeometry.Create([|source|], [|element|])
         let material = SCNMaterial.Create ()
-        material.Diffuse.ContentColor <- UIColor.FromRGB(0xCC, 0xCC, 0x00)
+        material.Diffuse.ContentColor <- UIColor.SystemOrange
         element.PointSize <- nfloat 0.01f
         element.MinimumPointScreenSpaceRadius <- nfloat 1.0f
         element.MaximumPointScreenSpaceRadius <- nfloat 5.0f

@@ -28,11 +28,16 @@ type TrainingService (project : Project) =
     let useTanh = false
     //let dropoutRate = 0.2f
 
+    let numEpochs = 10
+
     // Derived parameters
 
     let batchTrained = Event<_> ()
 
     let weightsInit = WeightsInit.Default//.GlorotUniform (0.54f) //.Uniform (-0.02f, 0.02f)
+
+    let reportError (e : exn) =
+        printfn "ERROR: %O" e
 
     let createSdfModel () =
         let input = Tensor.Input("xyz", 3)
@@ -72,32 +77,32 @@ type TrainingService (project : Project) =
         let totalLoss = surfaceLoss * (1.0f - inputFreespace) + freespaceLoss * inputFreespace
 
         model.AddLoss (totalLoss)
-        let r = model.Compile (new AdamOptimizer (learningRate))
+
+        try
+            model.Compile (new AdamOptimizer (learningRate)) |> ignore
+        with ex ->
+            reportError ex
+
         printfn "%s" model.Summary
         model
 
-    let mutable data : SdfDataSet option = None
-    let getData () =
-        match data with
-        | Some x -> x
-        | None ->
-            let d = SdfDataSet (dataDir, samplingDistance, outputScale)
-            data <- Some d
-            d
+    let data = lazy SdfDataSet (dataDir, samplingDistance, outputScale)
+            
 
     let modelPath = dataDir + "/Model.zip"
 
-    let model = 
-        if false && File.Exists modelPath then
-            let fileSize = (new FileInfo(modelPath)).Length
-            let model = Model.Load (modelPath)
-            let r = model.Compile (Loss.MeanAbsoluteError,
-                                    new AdamOptimizer(learningRate))
-            model
-        else
-            createSdfModel ()
+    let model =
+        lazy
+            if false && File.Exists modelPath then
+                let fileSize = (new FileInfo(modelPath)).Length
+                let model = Model.Load (modelPath)
+                let r = model.Compile (Loss.MeanAbsoluteError,
+                                        new AdamOptimizer(learningRate))
+                model
+            else
+                createSdfModel ()
 
-    let trainingModel = createTrainingModel model
+    let trainingModel = lazy createTrainingModel model.Value
 
     let mutable trainedPoints = 0
 
@@ -110,28 +115,30 @@ type TrainingService (project : Project) =
     member this.Train () =
         //let data = SdfDataSet ("/Users/fak/Data/NeuralScanner/Onewheel")
         //let struct(inputs, outputs) = data.GetRow(0, null)
-        printfn "%O" trainingModel
-        let data = getData ()
-        //this.GenerateMesh ()
         let mutable totalTrained = 0
-        let numEpochs = 10
         let callback (h : TrainingHistory.BatchHistory) =
             //printfn "LOSS %g" h.AverageLoss
             totalTrained <- batchSize + totalTrained
-            let progress = float32 totalTrained / float32 (numEpochs * data.Count)
+            let progress = float32 totalTrained / float32 (numEpochs * data.Value.Count)
             let loss = h.AverageLoss
             losses.Add (loss)
             batchTrained.Trigger (progress, totalTrained, loss)
-            ()
-        for epoch in 0..(numEpochs-1) do
-            let history = trainingModel.Fit(data, batchSize = batchSize, epochs = 1.0f, callback = fun h -> callback h)
-            trainedPoints <- trainedPoints + data.Count
-            this.GenerateMesh ()
-        ()
+
+        try
+            let trainingModel = trainingModel.Value
+            printfn "%O" trainingModel
+            let data = data.Value
+            //this.GenerateMesh ()
+            for epoch in 0..(numEpochs-1) do
+                let history = trainingModel.Fit(data, batchSize = batchSize, epochs = 1.0f, callback = fun h -> callback h)
+                trainedPoints <- trainedPoints + data.Count
+                this.GenerateMesh ()
+        with ex ->
+            reportError ex
 
     member this.Save () =
-        trainingModel.SaveArchive (modelPath)
-        ()
+        if trainingModel.IsValueCreated then
+            trainingModel.Value.SaveArchive (modelPath)
 
     member this.GenerateMesh () =
 
@@ -139,7 +146,8 @@ type TrainingService (project : Project) =
         let mutable numPoints = 0
         let totalPoints = nx*ny*nz
 
-        let data = getData ()
+        let data = data.Value
+        let model = model.Value
 
         let sdf (x : Memory<Vector3>) (y : Memory<Vector4>) =
             let batchTensors = Array.init x.Length (fun i ->

@@ -6,7 +6,7 @@ open UIKit
 
 
 type ProjectsViewController () =
-    inherit UITableViewController (Title = "Projects")
+    inherit UITableViewController (Title = "Objects")
     
     let mutable projects : Project[] = Array.empty        
 
@@ -22,6 +22,12 @@ type ProjectsViewController () =
         | split ->
             let projectVC = new ProjectViewController (project)
             let projectNC = new UINavigationController (projectVC)
+            match split.GetViewController (UISplitViewControllerColumn.Secondary) with
+            | :? UINavigationController as nc ->
+                match nc.ViewControllers.[0] with
+                | :? ProjectViewController as vc -> vc.Stop ()
+                | _ -> ()
+            | _ -> ()
             split.SetViewController (projectNC, UISplitViewControllerColumn.Secondary)
 
     override this.GetCell (tableView, indexPath) =
@@ -60,6 +66,11 @@ and ProjectCell () =
 
     let mutable projectO : Project option = None
     let mutable changedSub : IDisposable option = None
+
+    static let projectIcon = UIImage.GetSystemImage "cube"
+
+    do
+        base.ImageView.Image <- projectIcon
 
     member this.SetProject (project : Project) =
         // Unsubscribe
