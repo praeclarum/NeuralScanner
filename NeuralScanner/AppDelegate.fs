@@ -20,19 +20,23 @@ type AppDelegate() =
         let projectsVC = new ProjectsViewController ()
         let projectsNC = new UINavigationController (projectsVC)
 
-        let tabs = new UITabBarController ()
-        let tabVCs : UIViewController[] =
-            [|
-                new UINavigationController (trainVC)
-                //new UINavigationController (homeVC)
-                new UINavigationController (renderVC)
-            |]
-        tabs.SetViewControllers (tabVCs, false)
+        let gettingStartedVC = new UIViewController (Title = "Getting Started")
+        gettingStartedVC.View.BackgroundColor <- UIColor.SystemBackground
+        let gettingStartedNC = new UINavigationController (gettingStartedVC)
+
+        //let tabs = new UITabBarController ()
+        //let tabVCs : UIViewController[] =
+        //    [|
+        //        new UINavigationController (trainVC)
+        //        //new UINavigationController (homeVC)
+        //        new UINavigationController (renderVC)
+        //    |]
+        //tabs.SetViewControllers (tabVCs, false)
 
         let split = new UISplitViewController(UISplitViewControllerStyle.DoubleColumn)
         split.PrimaryBackgroundStyle <- UISplitViewControllerBackgroundStyle.Sidebar
         split.SetViewController(projectsNC, UISplitViewControllerColumn.Primary)
-        split.SetViewController(trainVC, UISplitViewControllerColumn.Secondary)
+        split.SetViewController(gettingStartedNC, UISplitViewControllerColumn.Secondary)
 
         this.Window.RootViewController <- split
         this.Window.MakeKeyAndVisible()

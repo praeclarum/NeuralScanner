@@ -14,7 +14,7 @@ open CoreML
 open FSharp.NativeInterop
 
 type LossGraphView () =
-    inherit UIView (Frame = CGRect (0.0, 0.0, 320.0, 200.0))
+    inherit UIView (Frame = CGRect (0.0, 0.0, 320.0, 200.0), Opaque = false)
 
     let valueLabel = new UILabel(Frame = base.Bounds,
                                  AutoresizingMask = UIViewAutoresizing.FlexibleDimensions,
@@ -22,7 +22,8 @@ type LossGraphView () =
     do base.AddSubview valueLabel
 
     let progressView = new UIProgressView (Frame = base.Bounds,
-                                           AutoresizingMask = UIViewAutoresizing.FlexibleDimensions)
+                                           AutoresizingMask = UIViewAutoresizing.FlexibleDimensions,
+                                           Alpha = nfloat 0.0)
     do base.AddSubview progressView
 
     let losses = ResizeArray<float32> ()
@@ -44,12 +45,15 @@ type LossGraphView () =
     member this.AddLoss (progress : float32, loss : float32) =
         this.BeginInvokeOnMainThread (fun _ ->
             progressView.Progress <- float32 progress
+            progressView.Alpha <- if 1e-6f <= progress && progress <= (1.0f-1e-6f)
+                                  then nfloat 1.0
+                                  else  nfloat 0.0
             losses.Add loss
             this.SetNeedsDisplay ()
             valueLabel.Text <- sprintf "%.5f %.1f%%" loss (progress * 100.0f))
 
     override this.Draw (rect) =
-        UIColor.SystemGray.SetFill ()
+        UIColor.Clear.SetFill ()
         UIGraphics.RectFill (rect)
         if losses.Count > 1 then
             let bounds = this.Bounds

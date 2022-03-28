@@ -9,7 +9,7 @@ open ARKit
 open SceneKit
 
 type CaptureViewController (project : Project) =
-    inherit UIViewController ()
+    inherit BaseViewController ()
 
     let outputDir = project.CaptureDirectory
 
@@ -135,12 +135,12 @@ type CaptureViewController (project : Project) =
                     this.DismissViewController (true, null))
             }
             |> Async.Start))
+        sceneView.Delegate <- new CaptureViewDelegate ()
         loadSubs <-
             [|
                 captureButton.TouchUpInside.Subscribe (fun _ ->
                     needsCapture <- true)
             |]
-        sceneView.Delegate <- new CaptureViewDelegate ()
 
         //
         // Layout

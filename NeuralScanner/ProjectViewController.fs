@@ -10,7 +10,7 @@ open Praeclarum.AutoLayout
 
 
 type ProjectViewController (project : Project) =
-    inherit UIViewController ()
+    inherit BaseViewController ()
 
     // Services
     let trainingService = TrainingServices.getForProject (project)
@@ -44,8 +44,6 @@ type ProjectViewController (project : Project) =
 
     let stackView = new UIStackView (Axis = UILayoutConstraintAxis.Vertical)
 
-    let mutable loadSubs : IDisposable[] = Array.empty
-
     member this.HandleCapture () =
         let captureVC = new CaptureViewController (project)
         let captureNC = new UINavigationController (captureVC)
@@ -53,7 +51,47 @@ type ProjectViewController (project : Project) =
         this.PresentViewController(captureNC, true, null)
         ()
 
-    member this.UpdateUI () =
+    override this.ViewDidLoad () =
+        base.ViewDidLoad ()
+
+    override this.AddUI view =
+        //
+        // Layout
+        //
+        stackView.Frame <- this.View.Bounds
+        stackView.Alignment <- UIStackViewAlignment.Center
+        stackView.Distribution <- UIStackViewDistribution.EqualSpacing
+
+        stackView.TranslatesAutoresizingMaskIntoConstraints <- false
+        stackView.AddArrangedSubview (nameField)
+        stackView.AddArrangedSubview (labelCaptureInfo)
+        stackView.AddArrangedSubview (captureButton)
+        //stackView.AddArrangedSubview (lossView)
+        stackView.AddArrangedSubview (trainButtons)
+        stackView.AddArrangedSubview (new UIView ())
+
+        sceneView.Frame <- this.View.Bounds
+        sceneView.AutoresizingMask <- UIViewAutoresizing.FlexibleDimensions
+
+        lossView.TranslatesAutoresizingMaskIntoConstraints <- false
+
+        let view = this.View
+        view.AddSubview (sceneView)
+        view.AddSubview (stackView)
+        view.AddSubview (lossView)
+
+        [|
+            view.SafeAreaLayoutGuide.LayoutTop == stackView.LayoutTop
+            view.SafeAreaLayoutGuide.LayoutLeft == stackView.LayoutLeft
+            view.SafeAreaLayoutGuide.LayoutRight == stackView.LayoutRight
+            view.SafeAreaLayoutGuide.LayoutBottom == stackView.LayoutBottom
+            lossView.LayoutLeft == view.LayoutLeft
+            lossView.LayoutRight == view.LayoutRight
+            lossView.LayoutBottom == view.LayoutBottom
+            lossView.LayoutTop == view.SafeAreaLayoutGuide.LayoutBottom - 128.0
+        |]
+
+    override this.UpdateUI () =
         labelCaptureInfo.Text <-
             if project.NumCaptures = 0 then "Object not scanned"
             else sprintf "%d depth scans" project.NumCaptures
@@ -66,74 +104,30 @@ type ProjectViewController (project : Project) =
             pauseTrainButton.Enabled <- false
         ()
 
-    override this.ViewDidLoad () =
-        base.ViewDidLoad ()
+    override this.SubscribeUI () =
+        [|
+            project.Changed.Subscribe (fun _ ->
+                this.BeginInvokeOnMainThread (fun _ ->
+                    this.UpdateUI ()))
+            trainingService.Changed.Subscribe (fun _ ->
+                this.BeginInvokeOnMainThread (fun _ ->
+                    this.UpdateUI ()))
+            trainingService.BatchTrained.Subscribe (fun (progress, totalTrained, loss) ->
+                this.BeginInvokeOnMainThread (fun _ ->
+                    lossView.AddLoss (progress, loss)))
 
-        this.View.BackgroundColor <- UIColor.SystemBackground
+            nameField.EditingChanged.Subscribe (fun _ ->
+                project.Name <- nameField.Text)
 
-        //
-        // Subscribe to events
-        //
-        loadSubs <-
-            [|
-                project.Changed.Subscribe (fun _ ->
-                    this.BeginInvokeOnMainThread (fun _ ->
-                        this.UpdateUI ()))
-                trainingService.Changed.Subscribe (fun _ ->
-                    this.BeginInvokeOnMainThread (fun _ ->
-                        this.UpdateUI ()))
-                trainingService.BatchTrained.Subscribe (fun (progress, totalTrained, loss) ->
-                    this.BeginInvokeOnMainThread (fun _ ->
-                        lossView.AddLoss (progress, loss)))
+            captureButton.TouchUpInside.Subscribe(fun _ -> this.HandleCapture())
+            trainButton.TouchUpInside.Subscribe (fun _ ->
+                trainingService.Run ()
+                this.UpdateUI ())
+            pauseTrainButton.TouchUpInside.Subscribe (fun _ ->
+                trainingService.Pause ()
+                this.UpdateUI ())
+        |]
 
-                nameField.EditingChanged.Subscribe (fun _ ->
-                    project.Name <- nameField.Text)
-
-                captureButton.TouchUpInside.Subscribe(fun _ -> this.HandleCapture())
-                trainButton.TouchUpInside.Subscribe (fun _ ->
-                    trainingService.Run ()
-                    this.UpdateUI ())
-                pauseTrainButton.TouchUpInside.Subscribe (fun _ ->
-                    trainingService.Pause ()
-                    this.UpdateUI ())
-            |]
-        this.UpdateUI ()
-
-        //
-        // Layout
-        //
-        stackView.Frame <- this.View.Bounds
-        stackView.Alignment <- UIStackViewAlignment.Center
-        stackView.Distribution <- UIStackViewDistribution.EqualSpacing
-
-        stackView.TranslatesAutoresizingMaskIntoConstraints <- false
-        stackView.AddArrangedSubview (nameField)
-        stackView.AddArrangedSubview (labelCaptureInfo)
-        stackView.AddArrangedSubview (captureButton)
-        stackView.AddArrangedSubview (lossView)
-        stackView.AddArrangedSubview (trainButtons)
-        stackView.AddArrangedSubview (new UIView ())
-
-        sceneView.Frame <- this.View.Bounds
-        sceneView.AutoresizingMask <- UIViewAutoresizing.FlexibleDimensions
-
-        this.View.AddSubview (sceneView)
-        this.View.AddSubview (stackView)
-        this.View.AddConstraints
-            [|
-                this.View.SafeAreaLayoutGuide.LayoutTop == stackView.LayoutTop
-                this.View.SafeAreaLayoutGuide.LayoutBottom == stackView.LayoutBottom
-                this.View.SafeAreaLayoutGuide.LayoutLeft == stackView.LayoutLeft
-                this.View.SafeAreaLayoutGuide.LayoutRight == stackView.LayoutRight
-            |]
-
-    // This VC is going to be tossed out
-    member this.Stop () =
-        let subs = loadSubs
-        loadSubs <- Array.empty
-        for s in subs do
-            s.Dispose ()
-        ()
 
 
 

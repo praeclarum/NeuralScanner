@@ -100,12 +100,14 @@
     <Compile Include="Project.fs" />
     <Compile Include="TrainingService.fs" />
     <Compile Include="AutoLayout.fs" />
+    <Compile Include="BaseViewController.fs" />
     <Compile Include="CaptureViewController.fs" />
     <Compile Include="LossGraphView.fs" />
     <Compile Include="ProjectViewController.fs" />
     <Compile Include="ProjectsViewController.fs" />
     <Compile Include="TrainViewController.fs" />
     <Compile Include="RenderViewController.fs" />
+    <Compile Include="GettingStartedViewController.fs" />
     <Compile Include="AppDelegate.fs" />
     <Compile Include="Main.fs" />
     <BundleResource Include="Resources\SDF.mlmodel" />

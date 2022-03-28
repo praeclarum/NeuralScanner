@@ -24,9 +24,10 @@ type ProjectsViewController () =
             let projectNC = new UINavigationController (projectVC)
             match split.GetViewController (UISplitViewControllerColumn.Secondary) with
             | :? UINavigationController as nc ->
-                match nc.ViewControllers.[0] with
-                | :? ProjectViewController as vc -> vc.Stop ()
-                | _ -> ()
+                for vc in nc.ViewControllers do
+                    match vc with
+                    | :? BaseViewController as vc -> vc.StopUI ()
+                    | _ -> ()
             | _ -> ()
             split.SetViewController (projectNC, UISplitViewControllerColumn.Secondary)
 
