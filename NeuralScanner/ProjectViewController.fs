@@ -89,6 +89,12 @@ type ProjectViewController (project : Project) =
 
     override this.ViewDidLoad () =
         base.ViewDidLoad ()
+        this.NavigationItem.RightBarButtonItems <-
+            [|
+                new UIBarButtonItem (UIImage.GetSystemImage "gearshape", UIBarButtonItemStyle.Plain, this, new ObjCRuntime.Selector ("showProjectSettings:"))
+            |]
+
+    member this.SettingsButton = this.NavigationItem.RightBarButtonItems.[0]
 
     override this.AddUI view =
         capturePanel.TranslatesAutoresizingMaskIntoConstraints <- false
@@ -153,6 +159,8 @@ type ProjectViewController (project : Project) =
             pauseTrainButton.Enabled <- false
         if not learningRateSlider.UserInteracting then
             learningRateSlider.Value <- project.Settings.LearningRate
+        if not previewResolutionSlider.UserInteracting then
+            previewResolutionSlider.Value <- float32 project.Settings.ResolutionX
         Threading.ThreadPool.QueueUserWorkItem (fun _ -> this.UpdatePointCloud ()) |> ignore
 
     override this.SubscribeUI () =
@@ -202,6 +210,11 @@ type ProjectViewController (project : Project) =
                         this.BeginInvokeOnMainThread (fun _ -> this.UpdateUI ())))
         |]
 
+    [<Export("showProjectSettings:")>]
+    member this.ShowProjectSettings (sender : NSObject) =
+        let vc = new ProjectSettingsViewController (project)
+        this.PresentPopover (vc, this.SettingsButton)
+
     member this.UpdatePointCloud () =
         SCNTransaction.Begin ()
         for fi in project.DepthPaths do
@@ -227,7 +240,7 @@ type ProjectViewController (project : Project) =
         Threading.ThreadPool.QueueUserWorkItem (fun _ ->
             setProgress 0.0f
             try
-                let mesh = trainingService.GenerateMesh (32, setProgress)
+                let mesh = trainingService.GenerateMesh (setProgress)
                 let node =
                     if mesh.Vertices.Length > 0 && mesh.Triangles.Length > 0 then
                         let vertsSource =

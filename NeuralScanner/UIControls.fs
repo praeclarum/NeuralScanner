@@ -11,11 +11,32 @@ open SceneKit
 
 open Praeclarum.AutoLayout
 
+type IStoppable =
+    abstract StopUI : unit -> unit
 
-type ValueSlider (label : string, valueFormat : string, minSliderValue : float32, maxSliderValue,
+type Control () =
+    inherit UIView (TranslatesAutoresizingMaskIntoConstraints = false, BackgroundColor = UIColor.Clear)
+    
+type ControlTableCell (control : UIView, height : float) =
+    inherit UITableViewCell (UITableViewCellStyle.Default, "C")
+    do
+        let view = base.ContentView
+        control.TranslatesAutoresizingMaskIntoConstraints <- false
+        control.AutoresizingMask <- UIViewAutoresizing.FlexibleDimensions
+        view.AddSubview control
+        view.AddConstraints
+            [|
+                control.LayoutLeft == view.LayoutMarginsGuide.LayoutLeft
+                control.LayoutRight == view.LayoutMarginsGuide.LayoutRight
+                control.LayoutTop == view.LayoutMarginsGuide.LayoutTop
+                control.LayoutBottom == view.LayoutMarginsGuide.LayoutBottom
+            |]
+    member this.Control = control
+
+type ValueSlider (label : string, valueFormat : string,
+                  minSliderValue : float32, maxSliderValue,
                   sliderToValue : float32 -> float32, valueToSlider : float32 -> float32) =
-    inherit UIView (BackgroundColor = UIColor.Clear,
-                    TranslatesAutoresizingMaskIntoConstraints = false)
+    inherit Control ()
 
     let changed = Event<float32> ()
 
@@ -89,3 +110,148 @@ type ValueSlider (label : string, valueFormat : string, minSliderValue : float32
                         valueView.Text <- String.Format (valueFormat, v)
 
     member this.UserInteracting = userInteracting
+
+type ValueSliderTableCell (label : string, valueFormat : string,
+                           minSliderValue : float32, maxSliderValue,
+                           sliderToValue : float32 -> float32, valueToSlider : float32 -> float32) =
+    inherit ControlTableCell (new ValueSlider (label, valueFormat, minSliderValue, maxSliderValue, sliderToValue, valueToSlider), 44.0)
+    member this.ValueSlider = this.Control :?> ValueSlider
+
+
+module VCUtils =
+    let showException (ex : exn) (vc : UIViewController) =
+        printfn "ERROR: %O" ex
+        vc.BeginInvokeOnMainThread (fun _ ->
+            let alert = new UIAlertView ("Error", ex.ToString(), null, "OK")
+            alert.Show ())
+
+    let presentPopoverFromButtonItem (presentVC : UIViewController) (button : UIBarButtonItem) (vc : UIViewController) =
+        let nc =
+            match presentVC with
+            | :? UINavigationController as n -> n
+            | _ -> new UINavigationController (presentVC)
+        nc.ModalPresentationStyle <- UIModalPresentationStyle.Popover
+        match nc.PopoverPresentationController with
+        | null -> ()
+        | p ->
+            p.BarButtonItem <- button
+        vc.PresentViewController (nc, true, null)
+
+type BaseViewController () =
+    inherit UIViewController ()
+
+    let mutable loadSubs : IDisposable[] = Array.empty
+
+    abstract AddUI : UIView -> NSLayoutConstraint[]
+    override this.AddUI _ = Array.empty
+
+    abstract SubscribeUI : unit -> IDisposable[]
+    override this.SubscribeUI () = Array.empty
+
+    abstract UpdateUI : unit -> unit
+    override this.UpdateUI () = ()
+
+    abstract StopUI : unit -> unit
+    interface IStoppable with
+        member this.StopUI () = this.StopUI ()
+    override this.StopUI () =
+        let subs = loadSubs
+        loadSubs <- Array.empty
+        for s in subs do
+            s.Dispose ()
+
+    override this.ViewDidLoad () =
+        base.ViewDidLoad ()
+        let view = this.View
+        view.BackgroundColor <- UIColor.SystemBackground
+        view.AddConstraints (this.AddUI view)
+        loadSubs <- this.SubscribeUI ()
+        this.UpdateUI ()
+
+    member this.ShowError (ex : exn) = VCUtils.showException ex this
+    member this.PresentPopover (vc, b) = VCUtils.presentPopoverFromButtonItem vc b this
+        
+
+type BaseTableViewController (style : UITableViewStyle) =
+    inherit UITableViewController (style)
+
+    let mutable loadSubs : IDisposable[] = Array.empty
+
+    abstract SubscribeUI : unit -> IDisposable[]
+    override this.SubscribeUI () = Array.empty
+
+    abstract StopUI : unit -> unit
+    interface IStoppable with
+        member this.StopUI () = this.StopUI ()
+    override this.StopUI () =
+        let subs = loadSubs
+        loadSubs <- Array.empty
+        for s in subs do
+            s.Dispose ()
+
+    override this.ViewDidLoad () =
+        base.ViewDidLoad ()
+        loadSubs <- this.SubscribeUI ()
+
+    member this.ShowError (ex : exn) = VCUtils.showException ex this
+    member this.PresentPopover (vc, b) = VCUtils.presentPopoverFromButtonItem vc b this
+        
+
+type FormViewController () =
+    inherit BaseTableViewController (UITableViewStyle.InsetGrouped)
+
+    let mutable sections : FormSection[] = Array.empty
+
+    override this.ViewDidLoad () =
+        base.ViewDidLoad ()
+        this.TableView.AllowsSelection <- false
+
+    member this.SetSections (newSections : FormSection[]) =
+        sections <- newSections
+        if this.IsViewLoaded then
+            this.TableView.ReloadData ()
+        ()
+
+    override this.NumberOfSections (_) = nint sections.Length
+    override this.RowsInSection (_, section) =
+        let section = int section
+        if 0 <= section && section < sections.Length then
+            nint sections.[section].Rows.Length
+        else
+            nint 0
+
+    override this.TitleForHeader (_, section) =
+        let section = int section
+        if 0 <= section && section < sections.Length then
+            sections.[section].Header
+        else
+            ""
+    override this.TitleForFooter (_, section) =
+        let section = int section
+        if 0 <= section && section < sections.Length then
+            sections.[section].Footer
+        else
+            ""
+
+    override this.GetCell (tableView, indexPath) =
+        let section = int indexPath.Section
+        let row = int indexPath.Row
+        if 0 <= section && section < sections.Length && 0 <= row && row < sections.[section].Rows.Length then
+            let s = sections.[section]
+            s.Rows.[row]
+        else
+            match tableView.DequeueReusableCell ("ErrorCell") with
+            | null -> new UITableViewCell (UITableViewCellStyle.Default, "ErrorCell")
+            | x -> x
+
+
+and FormSection =
+    {
+        Header : string
+        Rows : UITableViewCell[]
+        Footer : string
+    }
+
+type ListViewController () =
+    inherit BaseTableViewController (UITableViewStyle.Plain)
+

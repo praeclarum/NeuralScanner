@@ -6,7 +6,7 @@ open UIKit
 
 
 type ProjectsViewController () =
-    inherit UITableViewController (Title = "Objects")
+    inherit ListViewController (Title = "Objects")
     
     let mutable projects : Project[] = Array.empty        
 

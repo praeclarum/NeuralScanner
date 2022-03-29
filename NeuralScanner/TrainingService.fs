@@ -220,9 +220,9 @@ type TrainingService (project : Project) =
             IO.File.Move (tmpPath, trainingModelPath)
             printfn "SAVED MODEL: %s" trainingModelPath
 
-    member this.GenerateMesh (resolution : int, progress : float32 -> unit) =
+    member this.GenerateMesh (progress : float32 -> unit) =
 
-        let nx, ny, nz = resolution, resolution, resolution
+        let nx, ny, nz = project.Settings.ResolutionX, project.Settings.ResolutionY, project.Settings.ResolutionZ
         let mutable numPoints = 0
         let totalPoints = nx*ny*nz
 

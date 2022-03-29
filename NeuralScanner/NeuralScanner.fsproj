@@ -101,7 +101,7 @@
     <Compile Include="TrainingService.fs" />
     <Compile Include="AutoLayout.fs" />
     <Compile Include="UIControls.fs" />
-    <Compile Include="BaseViewController.fs" />
+    <Compile Include="ProjectSettingsViewController.fs" />
     <Compile Include="CaptureViewController.fs" />
     <Compile Include="LossGraphView.fs" />
     <Compile Include="ProjectViewController.fs" />

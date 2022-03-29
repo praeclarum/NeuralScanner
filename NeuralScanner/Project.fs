@@ -60,11 +60,11 @@ type Project (settings : ProjectSettings, projectDir : string) =
         Threading.ThreadPool.QueueUserWorkItem (fun _ ->
             lock saveMonitor (fun () ->
                 printfn "SAVE TO: %s" settingsPath
-                config.Write (settingsPath))
-            //let fileOutput = IO.File.ReadAllText(settingsPath)
-            //printfn "FILE:\n%s" fileOutput
-            //let newConfig = Config.Read<ProjectSettings> (settingsPath)
-            ())
+                config.Write (settingsPath)
+                //let fileOutput = IO.File.ReadAllText(settingsPath)
+                //printfn "FILE:\n%s" fileOutput
+                //let newConfig = Config.Read<ProjectSettings> (settingsPath)
+                ()))
         |> ignore
 
 
@@ -85,7 +85,7 @@ and ProjectSettings (name : string,
     member val ResolutionZ = resolutionZ with get, set
 
     override this.Config =
-        base.Config.Add("name", this.Name).Add("learningRate", this.LearningRate).Add("modifiedUtc", this.ModifiedUtc).Add("resolutionX", resolutionX).Add("resolutionY", resolutionY).Add("resolutionZ", resolutionZ)
+        base.Config.Add("name", this.Name).Add("learningRate", this.LearningRate).Add("modifiedUtc", this.ModifiedUtc).Add("resolutionX", this.ResolutionX).Add("resolutionY", this.ResolutionY).Add("resolutionZ", this.ResolutionZ)
 
 
 module ProjectManager =
