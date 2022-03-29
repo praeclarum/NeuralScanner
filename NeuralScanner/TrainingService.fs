@@ -201,8 +201,12 @@ type TrainingService (project : Project) =
         match trainingModelO with
         | None -> ()
         | Some trainingModel ->
-            printfn "SAVE MODEL: %s" trainingModelPath
-            trainingModel.SaveArchive (trainingModelPath)
+            let tmpPath = IO.Path.GetTempFileName ()
+            trainingModel.SaveArchive (tmpPath)
+            if File.Exists (trainingModelPath) then
+                File.Delete (trainingModelPath)
+            IO.File.Move (tmpPath, trainingModelPath)
+            printfn "SAVED MODEL: %s" trainingModelPath
 
     member this.GenerateMesh (resolution : int, progress : float32 -> unit) =
 

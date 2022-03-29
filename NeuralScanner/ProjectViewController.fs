@@ -29,7 +29,8 @@ type ProjectViewController (project : Project) =
                                           TranslatesAutoresizingMaskIntoConstraints = false)
     let mutable updatingSlider = false
     let sliderToLearningRate (v : float32) =
-        MathF.Pow (10.0f, -((1.0f-v)*6.0f + 1.0f))
+        let logLR = float32 (int (10.0f * ((1.0f-v)*6.0f + 1.0f) + 0.5f)) / 10.0f
+        MathF.Pow (10.0f, -logLR)
     let learningRateToSlider (lr : float32) =
         1.0f - ((-MathF.Log10 (lr)-1.0f) / 6.0f)
     let learningRateLabel = new UILabel(Alpha = nfloat 0.75, TranslatesAutoresizingMaskIntoConstraints = false)
