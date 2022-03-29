@@ -25,16 +25,20 @@ type ProjectViewController (project : Project) =
     let lossView = new LossGraphView ()
     do lossView.SetLosses (trainingService.Losses)
 
-    let learningRateSlider = new UISlider(MinValue = 0.0f, MaxValue = 1.0f,
-                                          TranslatesAutoresizingMaskIntoConstraints = false)
-    let mutable updatingSlider = false
     let sliderToLearningRate (v : float32) =
         let logLR = float32 (int (10.0f * ((1.0f-v)*6.0f + 1.0f) + 0.5f)) / 10.0f
         MathF.Pow (10.0f, -logLR)
     let learningRateToSlider (lr : float32) =
         1.0f - ((-MathF.Log10 (lr)-1.0f) / 6.0f)
-    let learningRateLabel = new UILabel(Alpha = nfloat 0.75, TranslatesAutoresizingMaskIntoConstraints = false)
+    let learningRateSlider = new ValueSlider ("Learning Rate", "{0:0.0000000}",
+                                              0.0f, 1.0f,
+                                              sliderToLearningRate,
+                                              learningRateToSlider)
 
+    let previewResolutionSlider = new ValueSlider ("Resolution", "{0:0}",
+                                                   16.0f, 512.0f,
+                                                   (fun x -> MathF.Round x),
+                                                   (fun x -> x))
     let previewButton = UIButton.FromType(UIButtonType.RoundedRect)
     do
         previewButton.TranslatesAutoresizingMaskIntoConstraints <- false
@@ -106,9 +110,9 @@ type ProjectViewController (project : Project) =
         view.AddSubview trainButtons
         view.AddSubview capturePanel
         view.AddSubview learningRateSlider
-        view.AddSubview learningRateLabel
         view.AddSubview previewProgress
         view.AddSubview previewButton
+        view.AddSubview previewResolutionSlider
 
         [|
             nameField.LayoutTop == previewProgress.LayoutBottom
@@ -123,13 +127,13 @@ type ProjectViewController (project : Project) =
             learningRateSlider.LayoutCenterX == lossView.LayoutCenterX
             learningRateSlider.LayoutBottom == trainButtons.LayoutTop
             learningRateSlider.LayoutWidth == lossView.LayoutWidth * 0.5
-            learningRateSlider.LayoutHeight == 44.0
-            learningRateLabel.LayoutLeading == learningRateSlider.LayoutTrailing + 11.0f
-            learningRateLabel.LayoutCenterY == learningRateSlider.LayoutCenterY
             capturePanel.LayoutCenterX == lossView.LayoutCenterX
             capturePanel.LayoutTop == nameField.LayoutBottom + 11.0
             previewButton.LayoutCenterX == capturePanel.LayoutCenterX
             previewButton.LayoutTop == capturePanel.LayoutBottom + 11.0
+            previewResolutionSlider.LayoutTop == previewButton.LayoutBottom
+            previewResolutionSlider.LayoutCenterX == previewButton.LayoutCenterX
+            previewResolutionSlider.LayoutWidth == view.LayoutWidth * 0.5
             previewProgress.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
             previewProgress.LayoutHeight == 4
             previewProgress.LayoutLeft == view.SafeAreaLayoutGuide.LayoutLeft
@@ -147,9 +151,8 @@ type ProjectViewController (project : Project) =
         else
             trainButton.Enabled <- project.NumCaptures > 0
             pauseTrainButton.Enabled <- false
-        learningRateLabel.Text <- sprintf "%0.7f" project.Settings.LearningRate
-        if not updatingSlider then
-            learningRateSlider.Value <- learningRateToSlider project.Settings.LearningRate
+        if not learningRateSlider.UserInteracting then
+            learningRateSlider.Value <- project.Settings.LearningRate
         Threading.ThreadPool.QueueUserWorkItem (fun _ -> this.UpdatePointCloud ()) |> ignore
 
     override this.SubscribeUI () =
@@ -165,12 +168,9 @@ type ProjectViewController (project : Project) =
                 this.BeginInvokeOnMainThread (fun _ ->
                     lossView.AddLoss (progress, loss)))
 
-            learningRateSlider.ValueChanged.Subscribe (fun _ ->
-                updatingSlider <- true
-                let lr = sliderToLearningRate learningRateSlider.Value
+            learningRateSlider.ValueChanged.Subscribe (fun lr ->
                 project.Settings.LearningRate <- lr
                 project.SetModified "LearningRate"
-                updatingSlider <- false
                 ())
 
             nameField.EditingChanged.Subscribe (fun _ ->

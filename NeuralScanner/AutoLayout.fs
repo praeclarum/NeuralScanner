@@ -60,6 +60,8 @@ type LayoutRef =
     static member ( * ) (r, m : float) = { r with M = r.M * nfloat m; C = r.C * nfloat m }
     static member ( * ) (m : float32, r) = { r with M = r.M * nfloat m; C = r.C * nfloat m }
     static member ( * ) (r, m : float32) = { r with M = r.M * nfloat m; C = r.C * nfloat m }
+    static member ( * ) (m : int, r) = { r with M = r.M * nfloat (float m); C = r.C * nfloat (float m) }
+    static member ( * ) (r, m : int) = { r with M = r.M * nfloat (float m); C = r.C * nfloat (float m) }
     static member ( / ) (r, m : nfloat) = { r with M = r.M / m; C = r.C / m }
     static member ( / ) (r, m : float) = { r with M = r.M / nfloat m; C = r.C / nfloat m }
     static member ( / ) (r, m : float32) = { r with M = r.M / nfloat m; C = r.C / nfloat m }
@@ -69,12 +71,16 @@ type LayoutRef =
     static member ( + ) (r, c : float) = { r with C = r.C + nfloat c }
     static member ( + ) (c : float32, r) = { r with C = r.C + nfloat c }
     static member ( + ) (r, c : float32) = { r with C = r.C + nfloat c }
+    static member ( + ) (c : int, r) = { r with C = r.C + nfloat (float c) }
+    static member ( + ) (r, c : int) = { r with C = r.C + nfloat (float c) }
     static member ( - ) (c : nfloat, r) = { r with M = -r.M; C = c - r.C }
     static member ( - ) (r, c : nfloat) = { r with C = r.C - c }
     static member ( - ) (c : float, r) = { r with M = -r.M; C = nfloat c - r.C }
     static member ( - ) (r, c : float) = { r with C = r.C - nfloat c }
     static member ( - ) (c : float32, r) = { r with M = -r.M; C = nfloat c - r.C }
     static member ( - ) (r, c : float32) = { r with C = r.C - nfloat c }
+    static member ( - ) (c : int, r) = { r with M = -r.M; C = nfloat (float c) - r.C }
+    static member ( - ) (r, c : int) = { r with C = r.C - nfloat (float c) }
 
 #if __IOS__
 type UIView with
