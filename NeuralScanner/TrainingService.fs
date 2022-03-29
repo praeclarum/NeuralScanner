@@ -34,7 +34,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
     let volumeMin, volumeMax =
         let rmin = meanCenter - framesMin
         let rmax = framesMax - meanCenter
-        let r = Vector3.Max (rmin, rmax)
+        let r = Vector3.Min (rmin, rmax)
         let vmin = Vector3.Max (framesMin - 0.01f * Vector3.One, meanCenter - r)
         let vmax = Vector3.Min (framesMax + 0.01f * Vector3.One, meanCenter + r)
         vmin, vmax
