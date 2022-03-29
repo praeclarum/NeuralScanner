@@ -52,9 +52,10 @@ type ValueSlider (label : string, valueFormat : string,
     let labelView = new UILabel(Text = label,
                                 Font = labelFont,
                                 TranslatesAutoresizingMaskIntoConstraints = false)
-    let valueView = new UITextField(Text = String.Format (valueFormat, sliderToValue minSliderValue),
+    let valueView = new UITextField(Text = (sliderToValue minSliderValue).ToString (valueFormat),
                                     ShouldReturn = (fun x -> x.ResignFirstResponder () |> ignore; false),
                                     Font = valueFont,
+                                    TextColor = base.TintColor,
                                     BackgroundColor = UIColor.Clear,
                                     TranslatesAutoresizingMaskIntoConstraints = false)
 
@@ -86,7 +87,7 @@ type ValueSlider (label : string, valueFormat : string,
                 userInteracting <- true
                 try
                     let v = sliderToValue slider.Value
-                    valueView.Text <- String.Format (valueFormat, v)
+                    valueView.Text <- v.ToString (valueFormat)
                     changed.Trigger v
                 with ex ->
                     printfn "SLIDER ERROR: %O" ex
@@ -107,7 +108,7 @@ type ValueSlider (label : string, valueFormat : string,
     member this.Value with get () = sliderToValue slider.Value
                       and set v =
                         slider.Value <- valueToSlider v
-                        valueView.Text <- String.Format (valueFormat, v)
+                        valueView.Text <- v.ToString (valueFormat)
 
     member this.UserInteracting = userInteracting
 

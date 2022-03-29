@@ -30,12 +30,12 @@ type ProjectViewController (project : Project) =
         MathF.Pow (10.0f, -logLR)
     let learningRateToSlider (lr : float32) =
         1.0f - ((-MathF.Log10 (lr)-1.0f) / 6.0f)
-    let learningRateSlider = new ValueSlider ("Learning Rate", "{0:0.0000000}",
+    let learningRateSlider = new ValueSlider ("Learning Rate", "0.0000000",
                                               0.0f, 1.0f,
                                               sliderToLearningRate,
                                               learningRateToSlider)
 
-    let previewResolutionSlider = new ValueSlider ("Resolution", "{0:0}",
+    let previewResolutionSlider = new ValueSlider ("Resolution", "0",
                                                    16.0f, 512.0f,
                                                    (fun x -> MathF.Round x),
                                                    (fun x -> x))
