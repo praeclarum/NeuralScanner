@@ -34,6 +34,12 @@ type ProjectViewController (project : Project) =
         1.0f - ((-MathF.Log10 (lr)-1.0f) / 6.0f)
     let learningRateLabel = new UILabel(Alpha = nfloat 0.75, TranslatesAutoresizingMaskIntoConstraints = false)
 
+    let previewButton = UIButton.FromType(UIButtonType.RoundedRect)
+    do
+        previewButton.TranslatesAutoresizingMaskIntoConstraints <- false
+        previewButton.SetTitle("Preview", UIControlState.Normal)
+        previewButton.SetImage(UIImage.GetSystemImage "cube", UIControlState.Normal)
+
     let captureButton = UIButton.FromType(UIButtonType.RoundedRect)
     do
         captureButton.SetTitle("Scan Object", UIControlState.Normal)
@@ -45,14 +51,18 @@ type ProjectViewController (project : Project) =
 
     let trainButton = UIButton.FromType(UIButtonType.RoundedRect)
     let pauseTrainButton = UIButton.FromType(UIButtonType.RoundedRect)
+    let resetTrainButton = UIButton.FromType(UIButtonType.RoundedRect)
     do
         trainButton.SetTitle("Train", UIControlState.Normal)
-        trainButton.TouchUpInside.Add (fun _ -> trainingService.Run ())
+        trainButton.SetImage(UIImage.GetSystemImage "record.circle", UIControlState.Normal)
         pauseTrainButton.SetTitle("Pause Training", UIControlState.Normal)
-        pauseTrainButton.TouchUpInside.Add (fun _ -> trainingService.Pause ())
+        pauseTrainButton.SetImage(UIImage.GetSystemImage "pause.circle", UIControlState.Normal)
+        resetTrainButton.SetTitle("Reset Training", UIControlState.Normal)
+        resetTrainButton.SetImage(UIImage.GetSystemImage "arrow.counterclockwise.circle", UIControlState.Normal)
     let trainButtons = new UIStackView (Axis = UILayoutConstraintAxis.Horizontal, Spacing = nfloat 44.0)
     do trainButtons.AddArrangedSubview trainButton
     do trainButtons.AddArrangedSubview pauseTrainButton
+    do trainButtons.AddArrangedSubview resetTrainButton
     let nameField = new UITextField (Font = UIFont.PreferredTitle1, Placeholder = "Name", Text = project.Name)
 
     let previewProgress = new UIProgressView (Alpha = nfloat 0.0f, TranslatesAutoresizingMaskIntoConstraints = false)
@@ -97,6 +107,7 @@ type ProjectViewController (project : Project) =
         view.AddSubview learningRateSlider
         view.AddSubview learningRateLabel
         view.AddSubview previewProgress
+        view.AddSubview previewButton
 
         [|
             nameField.LayoutTop == previewProgress.LayoutBottom
@@ -105,7 +116,7 @@ type ProjectViewController (project : Project) =
             lossView.LayoutLeft == view.LayoutLeft
             lossView.LayoutRight == view.LayoutRight
             lossView.LayoutBottom == view.LayoutBottom
-            lossView.LayoutTop == view.SafeAreaLayoutGuide.LayoutBottom - 128.0
+            lossView.LayoutTop == view.SafeAreaLayoutGuide.LayoutBottom - 88.0
             trainButtons.LayoutCenterX == lossView.LayoutCenterX
             trainButtons.LayoutBottom == lossView.LayoutTop
             learningRateSlider.LayoutCenterX == lossView.LayoutCenterX
@@ -115,7 +126,9 @@ type ProjectViewController (project : Project) =
             learningRateLabel.LayoutLeading == learningRateSlider.LayoutTrailing + 11.0f
             learningRateLabel.LayoutCenterY == learningRateSlider.LayoutCenterY
             capturePanel.LayoutCenterX == lossView.LayoutCenterX
-            capturePanel.LayoutTop == nameField.LayoutBottom + 22.0
+            capturePanel.LayoutTop == nameField.LayoutBottom + 11.0
+            previewButton.LayoutCenterX == capturePanel.LayoutCenterX
+            previewButton.LayoutTop == capturePanel.LayoutBottom + 11.0
             previewProgress.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
             previewProgress.LayoutHeight == 4
             previewProgress.LayoutLeft == view.SafeAreaLayoutGuide.LayoutLeft
@@ -168,8 +181,19 @@ type ProjectViewController (project : Project) =
                 this.UpdateUI ())
             pauseTrainButton.TouchUpInside.Subscribe (fun _ ->
                 trainingService.Pause ()
-                this.GeneratePreviewMesh ()
                 this.UpdateUI ())
+            resetTrainButton.TouchUpInside.Subscribe (fun _ ->
+                trainingService.Pause ()
+                trainingService.Reset ()
+                this.UpdateUI ())
+            previewButton.TouchUpInside.Subscribe (fun _ ->
+                let wasTraining = trainingService.IsTraining
+                trainingService.Pause ()
+                this.UpdateUI ()
+                this.GeneratePreviewMesh (fun () ->
+                    if wasTraining then
+                        trainingService.Run ()
+                        this.BeginInvokeOnMainThread (fun _ -> this.UpdateUI ())))
         |]
 
     member this.UpdatePointCloud () =
@@ -184,39 +208,45 @@ type ProjectViewController (project : Project) =
             ()
         SCNTransaction.Commit ()
 
-    member this.GeneratePreviewMesh () =
+    member private this.GeneratePreviewMesh (k : unit -> unit) =
         let setProgress p =
             this.BeginInvokeOnMainThread (fun _ ->
                 if 1e-6f <= p && p < 0.995f then
+                    previewButton.Enabled <- false
                     previewProgress.Progress <- p
                     previewProgress.Alpha <- nfloat 1.0
                 else
+                    previewButton.Enabled <- true
                     previewProgress.Alpha <- nfloat 0.0)
         Threading.ThreadPool.QueueUserWorkItem (fun _ ->
             setProgress 0.0f
-            let mesh = trainingService.GenerateMesh (setProgress)
-            let vertsSource =
-                mesh.Vertices
-                |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))
-                |> SCNGeometrySource.FromVertices
-            let normsSource =
-                mesh.Normals
-                |> Array.map (fun v -> SCNVector3(-v.X, -v.Y, -v.Z))
-                |> SCNGeometrySource.FromNormals
-            let element =
-                let elemStream = new IO.MemoryStream ()
-                let elemWriter = new IO.BinaryWriter (elemStream)
-                for i in 0..(mesh.Triangles.Length - 1) do
-                    elemWriter.Write (mesh.Triangles.[i])
-                elemWriter.Flush ()
-                elemStream.Position <- 0L
-                let data = NSData.FromStream (elemStream)
-                SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Triangles, nint (mesh.Triangles.Length / 3), nint 4)
-            let geometry = SCNGeometry.Create([|vertsSource;normsSource|], [|element|])
-            let material = SCNMaterial.Create ()
-            material.Diffuse.ContentColor <- UIColor.White
-            geometry.FirstMaterial <- material
-            let node = SCNNode.FromGeometry(geometry)
+            let mesh = trainingService.GenerateMesh (32, setProgress)
+            let node =
+                if mesh.Vertices.Length > 0 && mesh.Triangles.Length > 0 then
+                    let vertsSource =
+                        mesh.Vertices
+                        |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))
+                        |> SCNGeometrySource.FromVertices
+                    let normsSource =
+                        mesh.Normals
+                        |> Array.map (fun v -> SCNVector3(-v.X, -v.Y, -v.Z))
+                        |> SCNGeometrySource.FromNormals
+                    let element =
+                        let elemStream = new IO.MemoryStream ()
+                        let elemWriter = new IO.BinaryWriter (elemStream)
+                        for i in 0..(mesh.Triangles.Length - 1) do
+                            elemWriter.Write (mesh.Triangles.[i])
+                        elemWriter.Flush ()
+                        elemStream.Position <- 0L
+                        let data = NSData.FromStream (elemStream)
+                        SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Triangles, nint (mesh.Triangles.Length / 3), nint 4)
+                    let geometry = SCNGeometry.Create([|vertsSource;normsSource|], [|element|])
+                    let material = SCNMaterial.Create ()
+                    material.Diffuse.ContentColor <- UIColor.White
+                    geometry.FirstMaterial <- material
+                    SCNNode.FromGeometry(geometry)
+                else
+                    SCNNode.Create ()
             SCNTransaction.Begin ()
             match previewNeuralMeshNode with
             | None -> ()
@@ -224,6 +254,7 @@ type ProjectViewController (project : Project) =
             previewNeuralMeshNode <- Some node
             rootNode.AddChildNode node
             SCNTransaction.Commit ()
-            ())
+            setProgress 1.1f
+            k ())
         |> ignore
 

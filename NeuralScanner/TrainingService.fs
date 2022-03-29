@@ -124,22 +124,41 @@ type TrainingService (project : Project) =
         printfn "%s" model.Summary
         model
 
-    let data = lazy SdfDataSet (project, samplingDistance, outputScale)
-            
+    let data = lazy SdfDataSet (project, samplingDistance, outputScale)            
 
-    let modelPath = dataDir + "/Model.zip"
+    //let modelPath = dataDir + "/Model.zip"
+    let trainingModelPath = dataDir + "/TrainingModel.zip"
 
-    let model =
-        lazy
-            if false && File.Exists modelPath then
-                let fileSize = (new FileInfo(modelPath)).Length
-                let model = Model.Load (modelPath)
-                let r = model.Compile (Loss.MeanAbsoluteError, optimizer)
+    let loadTrainingModel () =
+        try
+            if File.Exists trainingModelPath then
+                //let fileSize = (new FileInfo(modelPath)).Length
+                let model = Model.Load (trainingModelPath)
+                try
+                    model.Compile (optimizer) |> ignore
+                with ex ->
+                    reportError ex
                 model
             else
-                createSdfModel ()
+                createTrainingModel (createSdfModel ())
+        with ex ->
+            reportError ex
+            createTrainingModel (createSdfModel ())
 
-    let trainingModel = lazy createTrainingModel model.Value
+    let mutable trainingModelO : Model option = None
+
+    let getTrainingModel () =
+        match trainingModelO with
+        | Some x -> x
+        | None ->
+            let x = loadTrainingModel ()
+            trainingModelO <- Some x
+            x
+
+    let getModel () =
+        let tmodel = getTrainingModel ()
+        let model = tmodel.Submodels.[0]
+        model
 
     let mutable trainedPoints = 0
 
@@ -163,7 +182,7 @@ type TrainingService (project : Project) =
             batchTrained.Trigger (progress, totalTrained, loss)
 
         try
-            let trainingModel = trainingModel.Value
+            let trainingModel = getTrainingModel ()
             printfn "%O" trainingModel
             let data = data.Value
             optimizer.LearningRate <- project.Settings.LearningRate
@@ -175,19 +194,24 @@ type TrainingService (project : Project) =
                 epoch <- epoch + 1
         with ex ->
             reportError ex
+        if totalTrained > 0 then
+            this.Save ()
 
     member this.Save () =
-        if trainingModel.IsValueCreated then
-            trainingModel.Value.SaveArchive (modelPath)
+        match trainingModelO with
+        | None -> ()
+        | Some trainingModel ->
+            printfn "SAVE MODEL: %s" trainingModelPath
+            trainingModel.SaveArchive (trainingModelPath)
 
-    member this.GenerateMesh (progress : float32 -> unit) =
+    member this.GenerateMesh (resolution : int, progress : float32 -> unit) =
 
-        let nx, ny, nz = 64, 64, 64
+        let nx, ny, nz = resolution, resolution, resolution
         let mutable numPoints = 0
         let totalPoints = nx*ny*nz
 
         let data = data.Value
-        let model = model.Value
+        let model = getModel ()
 
         let sdf (x : Memory<Vector3>) (y : Memory<Vector4>) =
             let batchTensors = Array.init x.Length (fun i ->
@@ -204,9 +228,9 @@ type TrainingService (project : Project) =
                 //    printfn "%g" yvec.W
                 y.[i] <- yvec
             numPoints <- numPoints + y.Length
-            let p = float numPoints / float totalPoints
-            progress (float32 p)
-            printfn "NN Sample Progress: %.1f" (p * 100.0)
+            let p = float32 numPoints / float32 totalPoints
+            progress p
+            //printfn "NN Sample Progress: %.1f" (p * 100.0)
 
         let voxels = SdfKit.Voxels.SampleSdf (sdf, data.VolumeMin, data.VolumeMax, nx, ny, nz, batchSize = batchSize, maxDegreeOfParallelism = 2)
         voxels.ClipToBounds ()
@@ -237,6 +261,14 @@ type TrainingService (project : Project) =
             training <- None
             cts.Cancel ()
             changed.Trigger "IsTraining"
+
+    member this.Reset () =
+        try
+            if File.Exists trainingModelPath then
+                File.Delete trainingModelPath
+            trainingModelO <- None
+        with ex ->
+            reportError ex
 
 
 module TrainingServices =
