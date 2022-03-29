@@ -180,7 +180,7 @@ type TrainingService (project : Project) =
         if trainingModel.IsValueCreated then
             trainingModel.Value.SaveArchive (modelPath)
 
-    member this.GenerateMesh () =
+    member this.GenerateMesh (progress : float32 -> unit) =
 
         let nx, ny, nz = 64, 64, 64
         let mutable numPoints = 0
@@ -204,8 +204,9 @@ type TrainingService (project : Project) =
                 //    printfn "%g" yvec.W
                 y.[i] <- yvec
             numPoints <- numPoints + y.Length
-            let progress = float numPoints / float totalPoints
-            printfn "NN Sample Progress: %.1f" (progress * 100.0)
+            let p = float numPoints / float totalPoints
+            progress (float32 p)
+            printfn "NN Sample Progress: %.1f" (p * 100.0)
 
         let voxels = SdfKit.Voxels.SampleSdf (sdf, data.VolumeMin, data.VolumeMax, nx, ny, nz, batchSize = batchSize, maxDegreeOfParallelism = 2)
         voxels.ClipToBounds ()

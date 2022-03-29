@@ -18,6 +18,9 @@ type LossGraphView () =
 
     let valueLabel = new UILabel(Frame = CGRect (0.0, 0.0, 320.0, 32.0),
                                  AutoresizingMask = (UIViewAutoresizing.FlexibleBottomMargin ||| UIViewAutoresizing.FlexibleWidth),
+                                 ShadowColor = UIColor.SystemBackground,
+                                 ShadowOffset = CGSize (1.0, 1.0),
+                                 TextAlignment = UITextAlignment.Right,
                                  Font = UIFont.BoldSystemFontOfSize (nfloat 24.0))
     do base.AddSubview valueLabel
 

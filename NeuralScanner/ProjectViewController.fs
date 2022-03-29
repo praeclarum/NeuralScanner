@@ -53,7 +53,9 @@ type ProjectViewController (project : Project) =
     let trainButtons = new UIStackView (Axis = UILayoutConstraintAxis.Horizontal, Spacing = nfloat 44.0)
     do trainButtons.AddArrangedSubview trainButton
     do trainButtons.AddArrangedSubview pauseTrainButton
-    let nameField = new UITextField (Placeholder = "Name", Text = project.Name)
+    let nameField = new UITextField (Font = UIFont.PreferredTitle1, Placeholder = "Name", Text = project.Name)
+
+    let previewProgress = new UIProgressView (Alpha = nfloat 0.0f, TranslatesAutoresizingMaskIntoConstraints = false)
 
     let scene = SCNScene.Create()
     do sceneView.Scene <- scene
@@ -94,9 +96,10 @@ type ProjectViewController (project : Project) =
         view.AddSubview capturePanel
         view.AddSubview learningRateSlider
         view.AddSubview learningRateLabel
+        view.AddSubview previewProgress
 
         [|
-            nameField.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
+            nameField.LayoutTop == previewProgress.LayoutBottom
             nameField.LayoutLeading == view.SafeAreaLayoutGuide.LayoutLeading
             nameField.LayoutTrailing == view.SafeAreaLayoutGuide.LayoutTrailing
             lossView.LayoutLeft == view.LayoutLeft
@@ -112,7 +115,11 @@ type ProjectViewController (project : Project) =
             learningRateLabel.LayoutLeading == learningRateSlider.LayoutTrailing + 11.0f
             learningRateLabel.LayoutCenterY == learningRateSlider.LayoutCenterY
             capturePanel.LayoutCenterX == lossView.LayoutCenterX
-            capturePanel.LayoutBottom == learningRateSlider.LayoutTop - 22.0
+            capturePanel.LayoutTop == nameField.LayoutBottom + 22.0
+            previewProgress.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
+            previewProgress.LayoutHeight == 4
+            previewProgress.LayoutLeft == view.SafeAreaLayoutGuide.LayoutLeft
+            previewProgress.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight
         |]
 
     override this.UpdateUI () =
@@ -148,7 +155,7 @@ type ProjectViewController (project : Project) =
                 updatingSlider <- true
                 let lr = sliderToLearningRate learningRateSlider.Value
                 project.Settings.LearningRate <- lr
-                this.UpdateUI ()
+                project.SetModified "LearningRate"
                 updatingSlider <- false
                 ())
 
@@ -178,8 +185,16 @@ type ProjectViewController (project : Project) =
         SCNTransaction.Commit ()
 
     member this.GeneratePreviewMesh () =
+        let setProgress p =
+            this.BeginInvokeOnMainThread (fun _ ->
+                if 1e-6f <= p && p < 0.995f then
+                    previewProgress.Progress <- p
+                    previewProgress.Alpha <- nfloat 1.0
+                else
+                    previewProgress.Alpha <- nfloat 0.0)
         Threading.ThreadPool.QueueUserWorkItem (fun _ ->
-            let mesh = trainingService.GenerateMesh ()
+            setProgress 0.0f
+            let mesh = trainingService.GenerateMesh (setProgress)
             let vertsSource =
                 mesh.Vertices
                 |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))

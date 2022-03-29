@@ -5,11 +5,14 @@ open System.IO
 open MetalTensors
 
 module ProjectDefaults =
-    let learningRate = 2.0e-4f
+    let learningRate = 5.0e-4f
 
 
 type Project (settings : ProjectSettings, projectDir : string) =
     
+    let settingsPath = Path.Combine (projectDir, "Settings.xml")
+    let saveMonitor = obj ()
+
     let mutable captureFiles = Directory.GetFiles (projectDir, "*_Depth.pixelbuffer")
 
     let frames = System.Collections.Concurrent.ConcurrentDictionary<string, SdfFrame> ()
@@ -34,7 +37,7 @@ type Project (settings : ProjectSettings, projectDir : string) =
 
     override this.ToString () = sprintf "Project %s" this.Name
 
-    member private this.SetModified (property : string) =
+    member this.SetModified (property : string) =
         this.Settings.ModifiedUtc <- DateTime.UtcNow
         this.Save ()
         changed.Trigger property
@@ -52,13 +55,16 @@ type Project (settings : ProjectSettings, projectDir : string) =
         changed.Trigger "NumCaptures"
 
     member this.Save () =
-        let settingsPath = Path.Combine (projectDir, "Settings.xml")
-        printfn "SAVE TO: %s" settingsPath
-        this.Settings.Save (settingsPath)
-        //let fileOutput = IO.File.ReadAllText(settingsPath)
-        //printfn "FILE:\n%s" fileOutput
-        //let newConfig = Config.Read<ProjectSettings> (settingsPath)
-        ()
+        let config = this.Settings.Config
+        Threading.ThreadPool.QueueUserWorkItem (fun _ ->
+            lock saveMonitor (fun () ->
+                printfn "SAVE TO: %s" settingsPath
+                config.Write (settingsPath))
+            //let fileOutput = IO.File.ReadAllText(settingsPath)
+            //printfn "FILE:\n%s" fileOutput
+            //let newConfig = Config.Read<ProjectSettings> (settingsPath)
+            ())
+        |> ignore
 
 
 and ProjectSettings (name : string, learningRate : float32, modifiedUtc : DateTime) =
