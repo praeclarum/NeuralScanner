@@ -39,3 +39,9 @@ type BaseViewController () =
         loadSubs <- this.SubscribeUI ()
         this.UpdateUI ()
 
+    member this.ShowError (ex : exn) =
+        printfn "ERROR: %O" ex
+        this.BeginInvokeOnMainThread (fun _ ->
+            let alert = new UIAlertView ("Error", ex.ToString(), null, "OK")
+            alert.Show ())
+

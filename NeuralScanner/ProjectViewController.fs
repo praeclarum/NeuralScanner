@@ -170,8 +170,13 @@ type ProjectViewController (project : Project) =
 
             learningRateSlider.ValueChanged.Subscribe (fun lr ->
                 project.Settings.LearningRate <- lr
-                project.SetModified "LearningRate"
-                ())
+                project.SetModified "Settings.LearningRate")
+            previewResolutionSlider.ValueChanged.Subscribe (fun r ->
+                let r = int r
+                project.Settings.ResolutionX <- r
+                project.Settings.ResolutionY <- r
+                project.Settings.ResolutionZ <- r
+                project.SetModified "Settings.Resolution")
 
             nameField.EditingChanged.Subscribe (fun _ ->
                 project.Name <- nameField.Text)
@@ -221,40 +226,43 @@ type ProjectViewController (project : Project) =
                     previewProgress.Alpha <- nfloat 0.0)
         Threading.ThreadPool.QueueUserWorkItem (fun _ ->
             setProgress 0.0f
-            let mesh = trainingService.GenerateMesh (32, setProgress)
-            let node =
-                if mesh.Vertices.Length > 0 && mesh.Triangles.Length > 0 then
-                    let vertsSource =
-                        mesh.Vertices
-                        |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))
-                        |> SCNGeometrySource.FromVertices
-                    let normsSource =
-                        mesh.Normals
-                        |> Array.map (fun v -> SCNVector3(-v.X, -v.Y, -v.Z))
-                        |> SCNGeometrySource.FromNormals
-                    let element =
-                        let elemStream = new IO.MemoryStream ()
-                        let elemWriter = new IO.BinaryWriter (elemStream)
-                        for i in 0..(mesh.Triangles.Length - 1) do
-                            elemWriter.Write (mesh.Triangles.[i])
-                        elemWriter.Flush ()
-                        elemStream.Position <- 0L
-                        let data = NSData.FromStream (elemStream)
-                        SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Triangles, nint (mesh.Triangles.Length / 3), nint 4)
-                    let geometry = SCNGeometry.Create([|vertsSource;normsSource|], [|element|])
-                    let material = SCNMaterial.Create ()
-                    material.Diffuse.ContentColor <- UIColor.White
-                    geometry.FirstMaterial <- material
-                    SCNNode.FromGeometry(geometry)
-                else
-                    SCNNode.Create ()
-            SCNTransaction.Begin ()
-            match previewNeuralMeshNode with
-            | None -> ()
-            | Some x -> x.RemoveFromParentNode ()
-            previewNeuralMeshNode <- Some node
-            rootNode.AddChildNode node
-            SCNTransaction.Commit ()
+            try
+                let mesh = trainingService.GenerateMesh (32, setProgress)
+                let node =
+                    if mesh.Vertices.Length > 0 && mesh.Triangles.Length > 0 then
+                        let vertsSource =
+                            mesh.Vertices
+                            |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))
+                            |> SCNGeometrySource.FromVertices
+                        let normsSource =
+                            mesh.Normals
+                            |> Array.map (fun v -> SCNVector3(-v.X, -v.Y, -v.Z))
+                            |> SCNGeometrySource.FromNormals
+                        let element =
+                            let elemStream = new IO.MemoryStream ()
+                            let elemWriter = new IO.BinaryWriter (elemStream)
+                            for i in 0..(mesh.Triangles.Length - 1) do
+                                elemWriter.Write (mesh.Triangles.[i])
+                            elemWriter.Flush ()
+                            elemStream.Position <- 0L
+                            let data = NSData.FromStream (elemStream)
+                            SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Triangles, nint (mesh.Triangles.Length / 3), nint 4)
+                        let geometry = SCNGeometry.Create([|vertsSource;normsSource|], [|element|])
+                        let material = SCNMaterial.Create ()
+                        material.Diffuse.ContentColor <- UIColor.White
+                        geometry.FirstMaterial <- material
+                        SCNNode.FromGeometry(geometry)
+                    else
+                        SCNNode.Create ()
+                SCNTransaction.Begin ()
+                match previewNeuralMeshNode with
+                | None -> ()
+                | Some x -> x.RemoveFromParentNode ()
+                previewNeuralMeshNode <- Some node
+                rootNode.AddChildNode node
+                SCNTransaction.Commit ()
+            with ex ->
+                this.ShowError ex
             setProgress 1.1f
             k ())
         |> ignore

@@ -6,6 +6,7 @@ open MetalTensors
 
 module ProjectDefaults =
     let learningRate = 1.0e-3f
+    let resolution = 32
 
 
 type Project (settings : ProjectSettings, projectDir : string) =
@@ -67,15 +68,24 @@ type Project (settings : ProjectSettings, projectDir : string) =
         |> ignore
 
 
-and ProjectSettings (name : string, learningRate : float32, modifiedUtc : DateTime) =
+and ProjectSettings (name : string,
+                     learningRate : float32,
+                     modifiedUtc : DateTime,
+                     resolutionX : int,
+                     resolutionY : int,
+                     resolutionZ : int
+                    ) =
     inherit Configurable ()
 
     member val Name = name with get, set
     member val LearningRate = learningRate with get, set
     member val ModifiedUtc = modifiedUtc with get, set
+    member val ResolutionX = resolutionX with get, set
+    member val ResolutionY = resolutionY with get, set
+    member val ResolutionZ = resolutionZ with get, set
 
     override this.Config =
-        base.Config.Add("name", this.Name).Add("learningRate", this.LearningRate).Add("modifiedUtc", this.ModifiedUtc)
+        base.Config.Add("name", this.Name).Add("learningRate", this.LearningRate).Add("modifiedUtc", this.ModifiedUtc).Add("resolutionX", resolutionX).Add("resolutionY", resolutionY).Add("resolutionZ", resolutionZ)
 
 
 module ProjectManager =
@@ -98,7 +108,12 @@ module ProjectManager =
                     Config.Read<ProjectSettings> (settingsPath)
                 with ex ->
                     printfn "LOAD ERROR: %O" ex
-                    let s = ProjectSettings ("Untitled", ProjectDefaults.learningRate, DateTime.UtcNow)
+                    let s = ProjectSettings ("Untitled",
+                                             ProjectDefaults.learningRate,
+                                             DateTime.UtcNow,
+                                             ProjectDefaults.resolution,
+                                             ProjectDefaults.resolution,
+                                             ProjectDefaults.resolution)
                     s.Save (settingsPath)
                     s
             let project = Project (settings, projectDir)
