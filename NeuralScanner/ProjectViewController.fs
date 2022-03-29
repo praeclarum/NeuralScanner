@@ -126,7 +126,7 @@ type ProjectViewController (project : Project) =
         else
             trainButton.Enabled <- project.NumCaptures > 0
             pauseTrainButton.Enabled <- false
-        learningRateLabel.Text <- sprintf "%0.6f" project.Settings.LearningRate
+        learningRateLabel.Text <- sprintf "%0.7f" project.Settings.LearningRate
         if not updatingSlider then
             learningRateSlider.Value <- learningRateToSlider project.Settings.LearningRate
         Threading.ThreadPool.QueueUserWorkItem (fun _ -> this.UpdatePointCloud ()) |> ignore

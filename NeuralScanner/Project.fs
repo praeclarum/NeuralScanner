@@ -5,7 +5,7 @@ open System.IO
 open MetalTensors
 
 module ProjectDefaults =
-    let learningRate = 1.0e-6f
+    let learningRate = 2.0e-4f
 
 
 type Project (settings : ProjectSettings, projectDir : string) =

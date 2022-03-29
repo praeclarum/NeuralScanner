@@ -57,7 +57,7 @@ type TrainingService (project : Project) =
     let outputScale = 200.0f
     let samplingDistance = 1.0e-3f
     let lossClipDelta = 1.0e-2f * outputScale
-    let learningRate = 1.0e-6f * outputScale
+    //let learningRate = 1.0e-6f * outputScale
     let networkDepth = 8
     let networkWidth = 512
     let batchSize = 1024
@@ -96,6 +96,8 @@ type TrainingService (project : Project) =
         printfn "%s" model.Summary
         model
 
+    let optimizer = new AdamOptimizer (project.Settings.LearningRate)
+
     let createTrainingModel (sdfModel : Model) : Model =
         let inputXyz = Tensor.Input("xyz", 3)
         let inputFreespace = Tensor.Input("freespace", 1)
@@ -115,7 +117,7 @@ type TrainingService (project : Project) =
         model.AddLoss (totalLoss)
 
         try
-            model.Compile (new AdamOptimizer (learningRate)) |> ignore
+            model.Compile (optimizer) |> ignore
         with ex ->
             reportError ex
 
@@ -132,8 +134,7 @@ type TrainingService (project : Project) =
             if false && File.Exists modelPath then
                 let fileSize = (new FileInfo(modelPath)).Length
                 let model = Model.Load (modelPath)
-                let r = model.Compile (Loss.MeanAbsoluteError,
-                                        new AdamOptimizer(learningRate))
+                let r = model.Compile (Loss.MeanAbsoluteError, optimizer)
                 model
             else
                 createSdfModel ()
@@ -165,10 +166,11 @@ type TrainingService (project : Project) =
             let trainingModel = trainingModel.Value
             printfn "%O" trainingModel
             let data = data.Value
+            optimizer.LearningRate <- project.Settings.LearningRate
             //this.GenerateMesh ()
             let mutable epoch = 0
             while not cancel.IsCancellationRequested && epoch < numEpochs do
-                let history = trainingModel.Fit(data, batchSize = batchSize, epochs = 1.0f, callback = fun h -> callback h)
+                let history = trainingModel.Fit (data, batchSize = batchSize, epochs = 1.0f, callback = fun h -> callback h)
                 trainedPoints <- trainedPoints + history.Batches.Length * batchSize
                 epoch <- epoch + 1
         with ex ->
