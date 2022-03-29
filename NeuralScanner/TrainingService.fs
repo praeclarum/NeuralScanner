@@ -88,7 +88,7 @@ type TrainingService (project : Project) =
         printfn "ERROR: %O" e
 
     let createSdfModel () =
-        let input = Tensor.Input("xyz", 3)
+        let input = Tensor.Input("xyzw", 4)
         let hiddenLayer (x : Tensor) (i : int) (drop : bool) =
             let r = x.Dense(networkWidth, weightsInit=weightsInit, name=sprintf "hidden%d" i).ReLU(sprintf "relu%d" i)
             //if drop then r.Dropout(dropoutRate, name=sprintf "drop%d" i) else r
@@ -111,7 +111,7 @@ type TrainingService (project : Project) =
     let optimizer = new AdamOptimizer (project.Settings.LearningRate)
 
     let createTrainingModel (sdfModel : Model) : Model =
-        let inputXyz = Tensor.Input("xyz", 3)
+        let inputXyz = Tensor.Input("xyzw", 4)
         let inputFreespace = Tensor.Input("freespace", 1)
         let inputExpected = Tensor.Input("distance", 1)
         let output = sdfModel.Call(inputXyz)
@@ -233,7 +233,7 @@ type TrainingService (project : Project) =
             let batchTensors = Array.init x.Length (fun i ->
                 let x = x.Span
                 let p = x.[i] - data.VolumeCenter
-                let input = Tensor.Array(p.X, p.Y, p.Z)
+                let input = Tensor.Array(p.X, p.Y, p.Z, 1.0f)
                 [|input|])
             let results = model.Predict(batchTensors)
             let y = y.Span

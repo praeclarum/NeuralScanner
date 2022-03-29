@@ -231,7 +231,7 @@ type SdfFrame (depthPath : string) =
 
         let pos = worldPosition x y depthOffset - Vector4(poi, 1.0f)
         let outputSignedDistance = -depthOffset * outputScale
-        let inputs = [| Tensor.Array(vector3Shape, pos.X, pos.Y, pos.Z)
+        let inputs = [| Tensor.Array(vector3Shape, pos.X, pos.Y, pos.Z, 1.0f)
                         Tensor.Array(freespaceShape, free)
                         Tensor.Array(distanceShape, outputSignedDistance) |]
         struct (inputs, [| |])
