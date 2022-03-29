@@ -152,24 +152,48 @@ type SdfFrame (depthPath : string) =
             geometry.FirstMaterial <- material
             geometry
 
+    let centerPoint =
+        lazy
+            let sx = width/2 - 1
+            let ex = sx + 3
+            let sy = height/2 - 1
+            let ey = sy + 3
+            let mutable sum = Vector3.Zero
+            let mutable n = 0
+            for x in sx..ex do
+                for y in sy..ey do
+                    let i = index x y
+                    if confidences.[i] > 0uy then
+                        let p = worldPosition x y 0.0f
+                        sum <- Vector3 (sum.X + p.X, sum.Y + p.Y, sum.Z + p.Z)
+                        n <- n + 1
+            if n > 0 then sum / float32 n
+            else sum
+
+    let minMaxPoints =
+        lazy
+            let mutable minv = Vector3.Zero
+            let mutable maxv = Vector3.Zero
+            let mutable n = 0
+            for x in 0..(width-1) do
+                for y in 0..(height-1) do
+                    let i = index x y
+                    if confidences.[i] > 0uy then
+                        let p = worldPosition x y 0.0f
+                        if n = 0 then
+                            minv <- Vector3(p.X, p.Y, p.Z)
+                            maxv <- minv
+                        else
+                            minv <- Vector3(min p.X minv.X, min p.Y minv.Y, min p.Z minv.Z)
+                            maxv <- Vector3(max p.X maxv.X, max p.Y maxv.Y, max p.Z maxv.Z)
+                        n <- n + 1
+            minv, maxv
+
     member this.DepthPath = depthPath
 
-    member this.CenterPoint =
-        let sx = width/2 - 1
-        let ex = sx + 3
-        let sy = height/2 - 1
-        let ey = sy + 3
-        let mutable sum = Vector3.Zero
-        let mutable n = 0
-        for x in sx..ex do
-            for y in 0..(height-1) do
-                let i = index x y
-                if confidences.[i] > 0uy then
-                    let p = worldPosition x y 0.0f
-                    sum <- Vector3 (sum.X + p.X, sum.Y + p.Y, sum.Z + p.Z)
-                    n <- n + 1
-        if n > 0 then sum / float32 n
-        else sum
+    member this.CenterPoint = centerPoint.Value
+    member this.MinPoint = fst minMaxPoints.Value
+    member this.MaxPoint = snd minMaxPoints.Value
 
     member this.FindInBoundPoints (min : Vector3, max : Vector3) =
         let inbounds = ResizeArray<_>()

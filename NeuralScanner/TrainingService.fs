@@ -21,26 +21,38 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         |> Array.map (fun x -> project.GetFrame x)
     let count = depthFiles |> Seq.sumBy (fun x -> 1)
     do if count = 0 then failwithf "No files in %s" dataDirectory
+    let framesMin =
+        let m = 1.0e6f*Vector3.One
+        frames |> Array.fold (fun a x -> Vector3.Min (x.MinPoint, a)) m
+    let framesMax =
+        let m = -1.0e6f*Vector3.One
+        frames |> Array.fold (fun a x -> Vector3.Max (x.MaxPoint, a)) m
 
     let meanCenter =
         if count > 0 then (frames |> Array.sumBy (fun x -> x.CenterPoint)) / float32 count
         else Vector3.Zero
-    let volumeMin = meanCenter - 1.0f*Vector3.One // Vector3 (-0.30533359f, -1.12338264f, -0.89218203f)
-    let volumeMax = meanCenter + 1.0f*Vector3.One //Vector3 (0.69466641f, -0.62338264f, 0.10781797f)
-    let poi = meanCenter // (volumeMin + volumeMax) * 0.5f
+    let volumeMin, volumeMax =
+        let rmin = meanCenter - framesMin
+        let rmax = framesMax - meanCenter
+        let r = Vector3.Max (rmin, rmax)
+        let vmin = Vector3.Max (framesMin - 0.01f * Vector3.One, meanCenter - r)
+        let vmax = Vector3.Min (framesMax + 0.01f * Vector3.One, meanCenter + r)
+        vmin, vmax
+        
+    let volumeCenter = (volumeMin + volumeMax) * 0.5f
 
     do for f in frames do f.FindInBoundPoints(volumeMin, volumeMax)
 
     member this.VolumeMin = volumeMin
     member this.VolumeMax = volumeMax
-    member this.VolumeCenter = poi
+    member this.VolumeCenter = volumeCenter
 
     override this.Count = frames |> Array.sumBy (fun x -> x.PointCount)
 
     override this.GetRow (index, _) =
         let inside = (index % 2) = 0
         let fi = StaticRandom.Next(frames.Length)
-        let struct (i, o) = frames.[fi].GetRow (inside, poi, samplingDistance, outputScale)
+        let struct (i, o) = frames.[fi].GetRow (inside, volumeCenter, samplingDistance, outputScale)
         //printfn "ROW%A D%A = %A" index inside i.[2].[0]
         struct (i, o)
 
