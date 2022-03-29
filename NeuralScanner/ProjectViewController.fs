@@ -25,6 +25,15 @@ type ProjectViewController (project : Project) =
     let lossView = new LossGraphView ()
     do lossView.SetLosses (trainingService.Losses)
 
+    let learningRateSlider = new UISlider(MinValue = 0.0f, MaxValue = 1.0f,
+                                          TranslatesAutoresizingMaskIntoConstraints = false)
+    let mutable updatingSlider = false
+    let sliderToLearningRate (v : float32) =
+        MathF.Pow (10.0f, -((1.0f-v)*6.0f + 1.0f))
+    let learningRateToSlider (lr : float32) =
+        1.0f - ((-MathF.Log10 (lr)-1.0f) / 6.0f)
+    let learningRateLabel = new UILabel(Alpha = nfloat 0.75, TranslatesAutoresizingMaskIntoConstraints = false)
+
     let captureButton = UIButton.FromType(UIButtonType.RoundedRect)
     do
         captureButton.SetTitle("Scan Object", UIControlState.Normal)
@@ -52,6 +61,7 @@ type ProjectViewController (project : Project) =
     let pointCloudNode = new SCNNode (Name = "PointCloud")
     do rootNode.AddChildNode pointCloudNode
     let framePointNodes = ConcurrentDictionary<string, SCNNode> ()
+    let mutable previewNeuralMeshNode : SCNNode option = None
 
     member this.HandleCapture () =
         let captureVC = new CaptureViewController (project)
@@ -82,6 +92,8 @@ type ProjectViewController (project : Project) =
         view.AddSubview nameField
         view.AddSubview trainButtons
         view.AddSubview capturePanel
+        view.AddSubview learningRateSlider
+        view.AddSubview learningRateLabel
 
         [|
             nameField.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
@@ -93,8 +105,14 @@ type ProjectViewController (project : Project) =
             lossView.LayoutTop == view.SafeAreaLayoutGuide.LayoutBottom - 128.0
             trainButtons.LayoutCenterX == lossView.LayoutCenterX
             trainButtons.LayoutBottom == lossView.LayoutTop
+            learningRateSlider.LayoutCenterX == lossView.LayoutCenterX
+            learningRateSlider.LayoutBottom == trainButtons.LayoutTop
+            learningRateSlider.LayoutWidth == lossView.LayoutWidth * 0.5
+            learningRateSlider.LayoutHeight == 44.0
+            learningRateLabel.LayoutLeading == learningRateSlider.LayoutTrailing + 11.0f
+            learningRateLabel.LayoutCenterY == learningRateSlider.LayoutCenterY
             capturePanel.LayoutCenterX == lossView.LayoutCenterX
-            capturePanel.LayoutBottom == trainButtons.LayoutTop - 22.0
+            capturePanel.LayoutBottom == learningRateSlider.LayoutTop - 22.0
         |]
 
     override this.UpdateUI () =
@@ -108,6 +126,9 @@ type ProjectViewController (project : Project) =
         else
             trainButton.Enabled <- project.NumCaptures > 0
             pauseTrainButton.Enabled <- false
+        learningRateLabel.Text <- sprintf "%0.6f" project.Settings.LearningRate
+        if not updatingSlider then
+            learningRateSlider.Value <- learningRateToSlider project.Settings.LearningRate
         Threading.ThreadPool.QueueUserWorkItem (fun _ -> this.UpdatePointCloud ()) |> ignore
 
     override this.SubscribeUI () =
@@ -122,6 +143,14 @@ type ProjectViewController (project : Project) =
             trainingService.BatchTrained.Subscribe (fun (progress, totalTrained, loss) ->
                 this.BeginInvokeOnMainThread (fun _ ->
                     lossView.AddLoss (progress, loss)))
+
+            learningRateSlider.ValueChanged.Subscribe (fun _ ->
+                updatingSlider <- true
+                let lr = sliderToLearningRate learningRateSlider.Value
+                project.Settings.LearningRate <- lr
+                this.UpdateUI ()
+                updatingSlider <- false
+                ())
 
             nameField.EditingChanged.Subscribe (fun _ ->
                 project.Name <- nameField.Text)
@@ -174,6 +203,10 @@ type ProjectViewController (project : Project) =
             geometry.FirstMaterial <- material
             let node = SCNNode.FromGeometry(geometry)
             SCNTransaction.Begin ()
+            match previewNeuralMeshNode with
+            | None -> ()
+            | Some x -> x.RemoveFromParentNode ()
+            previewNeuralMeshNode <- Some node
             rootNode.AddChildNode node
             SCNTransaction.Commit ()
             ())

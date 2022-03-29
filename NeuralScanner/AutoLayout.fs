@@ -40,6 +40,8 @@ type LayoutRef =
     static member FromConstant (c : float32) = LayoutRef.FromConstant (nfloat c)
     static member ( == ) (a, b) = LayoutRef.CreateConstraint a b NSLayoutRelation.Equal
     static member ( == ) (a, f) = LayoutRef.CreateConstraint a { View = null; Attribute = NSLayoutAttribute.NoAttribute; M = nfloat 1.0; C = f; P = 1000.0f } NSLayoutRelation.Equal
+    static member ( == ) (a, f : float) = LayoutRef.CreateConstraint a { View = null; Attribute = NSLayoutAttribute.NoAttribute; M = nfloat 1.0; C = nfloat f; P = 1000.0f } NSLayoutRelation.Equal
+    static member ( == ) (a, f : int) = LayoutRef.CreateConstraint a { View = null; Attribute = NSLayoutAttribute.NoAttribute; M = nfloat 1.0; C = nfloat (float f); P = 1000.0f } NSLayoutRelation.Equal
     static member ( >== ) (a, b) = LayoutRef.CreateConstraint a b NSLayoutRelation.GreaterThanOrEqual
     static member ( <== ) (a, b) = LayoutRef.CreateConstraint a b NSLayoutRelation.LessThanOrEqual
     static member ( >== ) (a, c : float) =
