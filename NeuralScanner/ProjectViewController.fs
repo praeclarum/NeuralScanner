@@ -153,19 +153,20 @@ type ProjectViewController (project : Project) =
             learningRateSlider.LayoutCenterX == lossView.LayoutCenterX
             learningRateSlider.LayoutBottom == trainButtons.LayoutTop
             learningRateSlider.LayoutWidth == lossView.LayoutWidth * 0.5
-            capturePanel.LayoutCenterX == lossView.LayoutCenterX
-            capturePanel.LayoutTop == nameField.LayoutBottom + 11.0
-            previewButton.LayoutCenterX == capturePanel.LayoutCenterX
-            previewButton.LayoutTop == capturePanel.LayoutBottom + 11.0
-            previewResolutionSlider.LayoutTop == previewButton.LayoutBottom
-            previewResolutionSlider.LayoutCenterX == previewButton.LayoutCenterX
+            previewResolutionSlider.LayoutTop == nameField.LayoutBottom + 11
+            previewResolutionSlider.LayoutCenterX == nameField.LayoutCenterX
             previewResolutionSlider.LayoutWidth == view.LayoutWidth * 0.5
             previewProgress.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
             previewProgress.LayoutHeight == 4
             previewProgress.LayoutLeft == view.SafeAreaLayoutGuide.LayoutLeft
             previewProgress.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight
-            viewButtons.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop + 44.0
-            viewButtons.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11.0
+
+            capturePanel.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11
+            capturePanel.LayoutBaseline == nameField.LayoutBaseline
+            viewButtons.LayoutTop == capturePanel.LayoutBottom + 11
+            viewButtons.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11
+            previewButton.LayoutTop == viewButtons.LayoutBottom + 33
+            previewButton.LayoutCenterX == viewButtons.LayoutCenterX
         |]
 
     override this.UpdateUI () =
