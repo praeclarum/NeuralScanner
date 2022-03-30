@@ -220,7 +220,7 @@ type TrainingService (project : Project) =
             printfn "SAVED MODEL: %s" trainingModelPath
 
     member this.GenerateVoxels (progress : float32 -> unit) =
-        let nx, ny, nz = project.Settings.ResolutionX, project.Settings.ResolutionY, project.Settings.ResolutionZ
+        let nx, ny, nz = int project.Settings.Resolution, int project.Settings.Resolution, int project.Settings.Resolution
         let mutable numPoints = 0
         let totalPoints = nx*ny*nz
 

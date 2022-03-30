@@ -42,7 +42,7 @@ type ToggleButton (title : string) =
     do
         base.Configuration <- config
         base.ConfigurationUpdateHandler <- fun b ->
-            printfn "BS %O" b.State
+            //printfn "BS %O" b.State
             if b.State.HasFlag (UIControlState.Selected) then
                 b.Configuration <- selectedConfig
             else
@@ -128,6 +128,10 @@ type ValueSlider (label : string, valueFormat : string,
 
     member this.UserInteracting = userInteracting
 
+    member this.UpdateValue (v) =
+        if not this.UserInteracting then
+            this.Value <- v
+
 type ValueSliderTableCell (label : string, valueFormat : string,
                            minSliderValue : float32, maxSliderValue,
                            sliderToValue : float32 -> float32, valueToSlider : float32 -> float32) =
@@ -197,6 +201,9 @@ type BaseTableViewController (style : UITableViewStyle) =
     abstract SubscribeUI : unit -> IDisposable[]
     override this.SubscribeUI () = Array.empty
 
+    abstract UpdateUI : unit -> unit
+    override this.UpdateUI () = ()
+
     abstract StopUI : unit -> unit
     interface IStoppable with
         member this.StopUI () = this.StopUI ()
@@ -209,6 +216,7 @@ type BaseTableViewController (style : UITableViewStyle) =
     override this.ViewDidLoad () =
         base.ViewDidLoad ()
         loadSubs <- this.SubscribeUI ()
+        this.UpdateUI ()
 
     member this.ShowError (ex : exn) = VCUtils.showException ex this
     member this.PresentPopover (vc, b) = VCUtils.presentPopoverFromButtonItem vc b this

@@ -2,11 +2,12 @@
 
 open System
 open System.IO
+open System.Numerics
 open MetalTensors
 
 module ProjectDefaults =
-    let learningRate = 1.0e-3f
-    let resolution = 32
+    let learningRate = 5.0e-4f
+    let resolution = 32.0f
 
 
 type Project (settings : ProjectSettings, projectDir : string) =
@@ -71,21 +72,23 @@ type Project (settings : ProjectSettings, projectDir : string) =
 and ProjectSettings (name : string,
                      learningRate : float32,
                      modifiedUtc : DateTime,
-                     resolutionX : int,
-                     resolutionY : int,
-                     resolutionZ : int
+                     resolution : float32,
+                     clipScale : Vector3,
+                     clipRotationDegrees : Vector3,
+                     clipTranslation : Vector3
                     ) =
     inherit Configurable ()
 
     member val Name = name with get, set
     member val LearningRate = learningRate with get, set
     member val ModifiedUtc = modifiedUtc with get, set
-    member val ResolutionX = resolutionX with get, set
-    member val ResolutionY = resolutionY with get, set
-    member val ResolutionZ = resolutionZ with get, set
+    member val Resolution = resolution with get, set
+    member val ClipScale = clipScale with get, set
+    member val ClipRotationDegrees = clipRotationDegrees with get, set
+    member val ClipTranslation = clipTranslation with get, set
 
     override this.Config =
-        base.Config.Add("name", this.Name).Add("learningRate", this.LearningRate).Add("modifiedUtc", this.ModifiedUtc).Add("resolutionX", this.ResolutionX).Add("resolutionY", this.ResolutionY).Add("resolutionZ", this.ResolutionZ)
+        base.Config.Add("name", this.Name).Add("learningRate", this.LearningRate).Add("modifiedUtc", this.ModifiedUtc).Add("resolution", this.Resolution).Add("clipScale", this.ClipScale).Add("clipRotationDegrees", this.ClipRotationDegrees).Add("clipTranslation", this.ClipTranslation)
 
 
 module ProjectManager =
@@ -95,6 +98,8 @@ module ProjectManager =
     let mutable private loadedProjects : Map<string, Project> = Map.empty
 
     do Config.EnableReading<ProjectSettings> ()
+
+    let showError (e : exn) = printfn "ERROR: %O" e
 
     let loadProject (projectDir : string) : Project =
         match loadedProjects.TryFind projectDir with
@@ -107,14 +112,18 @@ module ProjectManager =
                     //printfn "LOAD FROM: %s" settingsPath
                     Config.Read<ProjectSettings> (settingsPath)
                 with ex ->
-                    printfn "LOAD ERROR: %O" ex
+                    showError ex
                     let s = ProjectSettings ("Untitled",
                                              ProjectDefaults.learningRate,
                                              DateTime.UtcNow,
                                              ProjectDefaults.resolution,
-                                             ProjectDefaults.resolution,
-                                             ProjectDefaults.resolution)
-                    s.Save (settingsPath)
+                                             Vector3.One,
+                                             Vector3.Zero,
+                                             Vector3.Zero
+                                            )
+                    try
+                        s.Save (settingsPath)
+                    with ex2 -> showError ex2
                     s
             let project = Project (settings, projectDir)
             project.UpdateCaptures ()

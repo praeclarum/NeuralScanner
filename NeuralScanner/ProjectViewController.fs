@@ -77,11 +77,13 @@ type ProjectViewController (project : Project) =
 
     let previewProgress = new UIProgressView (Alpha = nfloat 0.0f, TranslatesAutoresizingMaskIntoConstraints = false)
 
+    let viewBoundsButton = new ToggleButton ("Bounds")
     let viewPointsButton = new ToggleButton ("Points")
     let viewVoxelsButton = new ToggleButton ("Voxels")
     let viewSolidMeshButton = new ToggleButton ("Solid Mesh")
     let viewButtons = new UIStackView (Axis = UILayoutConstraintAxis.Vertical, Spacing = nfloat 11.0, TranslatesAutoresizingMaskIntoConstraints = false)
     do
+        viewButtons.AddArrangedSubview viewBoundsButton
         viewButtons.AddArrangedSubview viewPointsButton
         viewButtons.AddArrangedSubview viewVoxelsButton
         viewButtons.AddArrangedSubview viewSolidMeshButton
@@ -94,6 +96,8 @@ type ProjectViewController (project : Project) =
     let framePointNodes = ConcurrentDictionary<string, SCNNode> ()
     let mutable solidMeshNode : SCNNode option = None
     let mutable solidVoxelsNode : SCNNode option = None
+    let boundsNode = new SCNNode (Name = "Bounds")
+    do rootNode.AddChildNode boundsNode
 
     let mutable visibleTypes : ViewObjectType = ViewObjectType.DepthPoints ||| ViewObjectType.SolidVoxels ||| ViewObjectType.SolidMesh
 
@@ -141,9 +145,13 @@ type ProjectViewController (project : Project) =
         let viewButtonGap = 11.0
 
         [|
-            nameField.LayoutTop == previewProgress.LayoutBottom
+            nameField.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
             nameField.LayoutLeading == view.SafeAreaLayoutGuide.LayoutLeading
             nameField.LayoutTrailing == view.SafeAreaLayoutGuide.LayoutTrailing
+            previewResolutionSlider.LayoutTop == nameField.LayoutBottom + 11
+            previewResolutionSlider.LayoutCenterX == nameField.LayoutCenterX
+            previewResolutionSlider.LayoutWidth == view.LayoutWidth * 0.5
+
             lossView.LayoutLeft == view.LayoutLeft
             lossView.LayoutRight == view.LayoutRight
             lossView.LayoutBottom == view.LayoutBottom
@@ -153,20 +161,17 @@ type ProjectViewController (project : Project) =
             learningRateSlider.LayoutCenterX == lossView.LayoutCenterX
             learningRateSlider.LayoutBottom == trainButtons.LayoutTop
             learningRateSlider.LayoutWidth == lossView.LayoutWidth * 0.5
-            previewResolutionSlider.LayoutTop == nameField.LayoutBottom + 11
-            previewResolutionSlider.LayoutCenterX == nameField.LayoutCenterX
-            previewResolutionSlider.LayoutWidth == view.LayoutWidth * 0.5
-            previewProgress.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
-            previewProgress.LayoutHeight == 4
-            previewProgress.LayoutLeft == view.SafeAreaLayoutGuide.LayoutLeft
-            previewProgress.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight
 
-            capturePanel.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11
             capturePanel.LayoutBaseline == nameField.LayoutBaseline
+            capturePanel.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11
             viewButtons.LayoutTop == capturePanel.LayoutBottom + 11
             viewButtons.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11
             previewButton.LayoutTop == viewButtons.LayoutBottom + 33
             previewButton.LayoutCenterX == viewButtons.LayoutCenterX
+            previewProgress.LayoutTop == previewButton.LayoutBottom
+            previewProgress.LayoutHeight == 4
+            previewProgress.LayoutLeft == viewButtons.LayoutLeft
+            previewProgress.LayoutRight == viewButtons.LayoutRight
         |]
 
     override this.UpdateUI () =
@@ -183,7 +188,7 @@ type ProjectViewController (project : Project) =
         if not learningRateSlider.UserInteracting then
             learningRateSlider.Value <- project.Settings.LearningRate
         if not previewResolutionSlider.UserInteracting then
-            previewResolutionSlider.Value <- float32 project.Settings.ResolutionX
+            previewResolutionSlider.Value <- project.Settings.Resolution
 
         if visibleTypes.HasFlag (ViewObjectType.DepthPoints) then
             pointCloudNode.Hidden <- false
@@ -233,10 +238,7 @@ type ProjectViewController (project : Project) =
                 project.Settings.LearningRate <- lr
                 project.SetModified "Settings.LearningRate")
             previewResolutionSlider.ValueChanged.Subscribe (fun r ->
-                let r = int r
-                project.Settings.ResolutionX <- r
-                project.Settings.ResolutionY <- r
-                project.Settings.ResolutionZ <- r
+                project.Settings.Resolution <- r
                 project.SetModified "Settings.Resolution")
 
             nameField.EditingChanged.Subscribe (fun _ ->
@@ -254,13 +256,16 @@ type ProjectViewController (project : Project) =
                 trainingService.Reset ()
                 this.UpdateUI ())
             previewButton.TouchUpInside.Subscribe (fun _ ->
+                previewButton.Enabled <- false
                 let wasTraining = trainingService.IsTraining
                 trainingService.Pause ()
                 this.UpdateUI ()
                 this.GeneratePreviewMesh (fun () ->
                     if wasTraining then
                         trainingService.Run ()
-                    this.BeginInvokeOnMainThread (fun _ -> this.UpdateUI ())))
+                    this.BeginInvokeOnMainThread (fun _ ->
+                        previewButton.Enabled <- true
+                        this.UpdateUI ())))
 
             viewPointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.DepthPoints))
             viewVoxelsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.SolidVoxels))
@@ -298,11 +303,9 @@ type ProjectViewController (project : Project) =
         let setProgress p =
             this.BeginInvokeOnMainThread (fun _ ->
                 if 1e-6f <= p && p < 0.995f then
-                    previewButton.Enabled <- false
                     previewProgress.Progress <- p
                     previewProgress.Alpha <- nfloat 1.0
                 else
-                    previewButton.Enabled <- true
                     previewProgress.Alpha <- nfloat 0.0)
         Threading.ThreadPool.QueueUserWorkItem (fun _ ->
             setProgress 0.0f
