@@ -3,6 +3,7 @@
 open System
 open System.IO
 open System.Numerics
+open SceneKit
 open MetalTensors
 
 module ProjectDefaults =
@@ -36,6 +37,13 @@ type Project (settings : ProjectSettings, projectDir : string) =
 
     member this.NumCaptures = captureFiles.Length
     member this.NewFrameIndex = this.NumCaptures
+
+    member this.ClipTransform =
+        let st = SCNMatrix4.Scale (this.Settings.ClipScale.X, this.Settings.ClipScale.Y, this.Settings.ClipScale.Z)
+        let tt = SCNMatrix4.CreateTranslation (this.Settings.ClipTranslation.X, this.Settings.ClipTranslation.Y, this.Settings.ClipTranslation.Z)
+        let rt = SCNMatrix4.CreateRotationY (this.Settings.ClipRotationDegrees.Y * (180.0f / MathF.PI))
+        st * rt * tt
+
 
     override this.ToString () = sprintf "Project %s" this.Name
 
@@ -83,9 +91,9 @@ and ProjectSettings (name : string,
     member val LearningRate = learningRate with get, set
     member val ModifiedUtc = modifiedUtc with get, set
     member val Resolution = resolution with get, set
-    member val ClipScale = clipScale with get, set
-    member val ClipRotationDegrees = clipRotationDegrees with get, set
-    member val ClipTranslation = clipTranslation with get, set
+    member val ClipScale : Vector3 = clipScale with get, set
+    member val ClipRotationDegrees : Vector3 = clipRotationDegrees with get, set
+    member val ClipTranslation : Vector3 = clipTranslation with get, set
 
     override this.Config =
         base.Config.Add("name", this.Name).Add("learningRate", this.LearningRate).Add("modifiedUtc", this.ModifiedUtc).Add("resolution", this.Resolution).Add("clipScale", this.ClipScale).Add("clipRotationDegrees", this.ClipRotationDegrees).Add("clipTranslation", this.ClipTranslation)

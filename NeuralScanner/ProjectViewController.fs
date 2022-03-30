@@ -92,12 +92,31 @@ type ProjectViewController (project : Project) =
     let scene = SCNScene.Create()
     do sceneView.Scene <- scene
     let rootNode = scene.RootNode
+    let cam = SCNCamera.Create()
+    do
+        cam.FieldOfView <- nfloat 60.0
+        cam.ZNear <- 0.001
+        cam.ZFar <- 100.0
+    let camNode = SCNNode.Create ()
+    do
+        camNode.Camera <- cam
+        let mutable t =  SCNMatrix4.LookAt (2.0f, 3.0f, 5.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f)
+        t.Invert ()
+        camNode.Transform <- t
+        rootNode.AddChildNode camNode
+        sceneView.PointOfView <- camNode
     let pointCloudNode = new SCNNode (Name = "PointCloud")
     do rootNode.AddChildNode pointCloudNode
     let framePointNodes = ConcurrentDictionary<string, SCNNode> ()
     let mutable solidMeshNode : SCNNode option = None
     let mutable solidVoxelsNode : SCNNode option = None
-    let boundsNode = new SCNNode (Name = "Bounds")
+    let boundsNode =
+        let g = SCNBox.Create (nfloat 2.0, nfloat 2.0, nfloat 2.0, nfloat 0.0)
+        let m = g.FirstMaterial
+        m.Transparency <- nfloat 0.25
+        let n = SCNNode.FromGeometry g
+        n.Name <- "Bounds"
+        n
     do rootNode.AddChildNode boundsNode
 
     let mutable visibleTypes : ViewObjectType = ViewObjectType.Bounds ||| ViewObjectType.DepthPoints ||| ViewObjectType.SolidVoxels ||| ViewObjectType.SolidMesh
@@ -190,6 +209,7 @@ type ProjectViewController (project : Project) =
             previewResolutionSlider.Value <- project.Settings.Resolution
 
         if visibleTypes.HasFlag (ViewObjectType.Bounds) then
+            boundsNode.Transform <- project.ClipTransform
             boundsNode.Hidden <- false
             viewBoundsButton.Selected <- true
         else
