@@ -72,7 +72,7 @@ type TrainingService (project : Project) =
     //let learningRate = 1.0e-6f * outputScale
     let networkDepth = 8
     let networkWidth = 512
-    let batchSize = 1024
+    let batchSize = 2*1024
     let useTanh = false
     //let dropoutRate = 0.2f
 
@@ -188,10 +188,9 @@ type TrainingService (project : Project) =
             //printfn "LOSS %g" h.AverageLoss
             h.ContinueTraining <- not cancel.IsCancellationRequested
             totalTrained <- batchSize + totalTrained
-            let progress = float32 totalTrained / float32 (numEpochs * data.Value.Count)
             let loss = h.AverageLoss
             losses.Add (loss)
-            batchTrained.Trigger (progress, totalTrained, loss)
+            batchTrained.Trigger (batchSize, totalTrained, loss)
 
         try
             let trainingModel = getTrainingModel ()
@@ -228,13 +227,23 @@ type TrainingService (project : Project) =
         let data = data.Value
         let model = getModel ()
 
+        let tpool = System.Buffers.ArrayPool<Tensor>.Shared
+        let tapool = System.Buffers.ArrayPool<Tensor[]>.Shared
+
         let sdf (x : Memory<Vector3>) (y : Memory<Vector4>) =
-            let batchTensors = Array.init x.Length (fun i ->
-                let x = x.Span
+            let n = x.Length
+            let batchTensors = tapool.Rent n
+            let x = x.Span
+            for i in 0..(n - 1) do
                 let p = x.[i] - data.VolumeCenter
                 let input = Tensor.Array(p.X, p.Y, p.Z, 1.0f)
-                [|input|])
-            let results = model.Predict(batchTensors)
+                let inputs = tpool.Rent 1
+                inputs.[0] <- input
+                batchTensors.[i] <- inputs
+            let results = model.Predict(batchTensors, n)
+            for i in 0..(n - 1) do
+                tpool.Return batchTensors.[i]
+            tapool.Return batchTensors
             let y = y.Span
             for i in 0..(x.Length-1) do
                 let r = results.[i].[0]

@@ -224,9 +224,9 @@ type ProjectViewController (project : Project) =
             trainingService.Changed.Subscribe (fun _ ->
                 this.BeginInvokeOnMainThread (fun _ ->
                     this.UpdateUI ()))
-            trainingService.BatchTrained.Subscribe (fun (progress, totalTrained, loss) ->
+            trainingService.BatchTrained.Subscribe (fun (batchSize, totalTrained, loss) ->
                 this.BeginInvokeOnMainThread (fun _ ->
-                    lossView.AddLoss (progress, loss)))
+                    lossView.AddLoss (batchSize, totalTrained, loss)))
 
             learningRateSlider.ValueChanged.Subscribe (fun lr ->
                 project.Settings.LearningRate <- lr

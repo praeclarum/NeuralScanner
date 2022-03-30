@@ -34,7 +34,7 @@ type ControlTableCell (control : UIView, height : float) =
     member this.Control = control
 
 type ToggleButton (title : string) =
-    inherit UIButton (UIButtonType.RoundedRect, TranslatesAutoresizingMaskIntoConstraints = false)
+    inherit UIButton (TranslatesAutoresizingMaskIntoConstraints = false)
     let selectedConfig = UIButtonConfiguration.FilledButtonConfiguration
     do selectedConfig.Title <- title
     let config = UIButtonConfiguration.BorderedButtonConfiguration

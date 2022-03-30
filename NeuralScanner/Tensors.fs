@@ -112,7 +112,7 @@ type SdfFrame (depthPath : string) =
 
     do printfn "FRAME %s center=%g, %g, %g" (IO.Path.GetFileName(depthPath)) centerPos.X centerPos.Y centerPos.Z
 
-    let vector3Shape = [| 3 |]
+    let vector4Shape = [| 4 |]
     let freespaceShape = [| 1 |]
     let distanceShape = [| 1 |]
 
@@ -231,9 +231,9 @@ type SdfFrame (depthPath : string) =
 
         let pos = worldPosition x y depthOffset - Vector4(poi, 1.0f)
         let outputSignedDistance = -depthOffset * outputScale
-        let inputs = [| Tensor.Array(vector3Shape, pos.X, pos.Y, pos.Z, 1.0f)
-                        Tensor.Array(freespaceShape, free)
-                        Tensor.Array(distanceShape, outputSignedDistance) |]
+        let inputs = [| Tensor.Array (vector4Shape, pos.X, pos.Y, pos.Z, 1.0f)
+                        Tensor.Constant (free, freespaceShape)
+                        Tensor.Constant (outputSignedDistance, distanceShape) |]
         struct (inputs, [| |])
 
     member this.GetPointGeometry () = pointGeometry.Value

@@ -45,7 +45,7 @@ type LossGraphView () =
                 this.SetNeedsDisplay ()
                 valueLabel.Text <- sprintf "%.5f" loss.[loss.Length - 1])
 
-    member this.AddLoss (progress : float32, loss : float32) =
+    member this.AddLoss (batchSize: int, totalTrained : int, loss : float32) =
         this.BeginInvokeOnMainThread (fun _ ->
             //progressView.Progress <- float32 progress
             //progressView.Alpha <- if 1e-6f <= progress && progress <= (1.0f-1e-6f)
