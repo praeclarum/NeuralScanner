@@ -15,6 +15,7 @@ type ViewObjectType =
     | DepthPoints = 1
     | SolidVoxels = 2
     | SolidMesh = 4
+    | Bounds = 8
 
 type ProjectViewController (project : Project) =
     inherit BaseViewController ()
@@ -99,7 +100,7 @@ type ProjectViewController (project : Project) =
     let boundsNode = new SCNNode (Name = "Bounds")
     do rootNode.AddChildNode boundsNode
 
-    let mutable visibleTypes : ViewObjectType = ViewObjectType.DepthPoints ||| ViewObjectType.SolidVoxels ||| ViewObjectType.SolidMesh
+    let mutable visibleTypes : ViewObjectType = ViewObjectType.Bounds ||| ViewObjectType.DepthPoints ||| ViewObjectType.SolidVoxels ||| ViewObjectType.SolidMesh
 
     member this.HandleCapture () =
         let captureVC = new CaptureViewController (project)
@@ -141,8 +142,6 @@ type ProjectViewController (project : Project) =
         view.AddSubview previewButton
         view.AddSubview previewResolutionSlider
         view.AddSubview viewButtons
-
-        let viewButtonGap = 11.0
 
         [|
             nameField.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
@@ -189,6 +188,13 @@ type ProjectViewController (project : Project) =
             learningRateSlider.Value <- project.Settings.LearningRate
         if not previewResolutionSlider.UserInteracting then
             previewResolutionSlider.Value <- project.Settings.Resolution
+
+        if visibleTypes.HasFlag (ViewObjectType.Bounds) then
+            boundsNode.Hidden <- false
+            viewBoundsButton.Selected <- true
+        else
+            boundsNode.Hidden <- true
+            viewBoundsButton.Selected <- false
 
         if visibleTypes.HasFlag (ViewObjectType.DepthPoints) then
             pointCloudNode.Hidden <- false
@@ -270,6 +276,7 @@ type ProjectViewController (project : Project) =
             viewPointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.DepthPoints))
             viewVoxelsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.SolidVoxels))
             viewSolidMeshButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.SolidMesh))
+            viewBoundsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.Bounds))
         |]
 
     [<Export("showProjectSettings:")>]
