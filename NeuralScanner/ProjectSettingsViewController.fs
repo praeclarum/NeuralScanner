@@ -23,8 +23,8 @@ type ProjectSettingsViewController (project : Project) =
                     Footer = "The output mesh will be constructed by sampling the neural network at the given interval."
                     Rows =
                         [|
-                            new ValueSliderTableCell ("Preview", "0", 10.0f, 1000.0f, id, id)
-                            new ValueSliderTableCell ("Output", "0", 10.0f, 1000.0f, id, id)
+                            new ValueSliderTableCell ("Preview", "0", 1.0f, 1000.0f, id, id)
+                            new ValueSliderTableCell ("Output", "0", 1.0f, 1000.0f, id, id)
                         |]
                 }
                 {

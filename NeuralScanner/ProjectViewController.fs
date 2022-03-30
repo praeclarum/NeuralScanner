@@ -78,7 +78,8 @@ type ProjectViewController (project : Project) =
     let pointCloudNode = new SCNNode (Name = "PointCloud")
     do rootNode.AddChildNode pointCloudNode
     let framePointNodes = ConcurrentDictionary<string, SCNNode> ()
-    let mutable previewNeuralMeshNode : SCNNode option = None
+    let mutable solidMeshNode : SCNNode option = None
+    let mutable solidVoxelsNode : SCNNode option = None
 
     member this.HandleCapture () =
         let captureVC = new CaptureViewController (project)
@@ -240,39 +241,21 @@ type ProjectViewController (project : Project) =
         Threading.ThreadPool.QueueUserWorkItem (fun _ ->
             setProgress 0.0f
             try
-                let mesh = trainingService.GenerateMesh (setProgress)
-                let node =
-                    if mesh.Vertices.Length > 0 && mesh.Triangles.Length > 0 then
-                        let vertsSource =
-                            mesh.Vertices
-                            |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))
-                            |> SCNGeometrySource.FromVertices
-                        let normsSource =
-                            mesh.Normals
-                            |> Array.map (fun v -> SCNVector3(-v.X, -v.Y, -v.Z))
-                            |> SCNGeometrySource.FromNormals
-                        let element =
-                            let elemStream = new IO.MemoryStream ()
-                            let elemWriter = new IO.BinaryWriter (elemStream)
-                            for i in 0..(mesh.Triangles.Length - 1) do
-                                elemWriter.Write (mesh.Triangles.[i])
-                            elemWriter.Flush ()
-                            elemStream.Position <- 0L
-                            let data = NSData.FromStream (elemStream)
-                            SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Triangles, nint (mesh.Triangles.Length / 3), nint 4)
-                        let geometry = SCNGeometry.Create([|vertsSource;normsSource|], [|element|])
-                        let material = SCNMaterial.Create ()
-                        material.Diffuse.ContentColor <- UIColor.White
-                        geometry.FirstMaterial <- material
-                        SCNNode.FromGeometry(geometry)
-                    else
-                        SCNNode.Create ()
+                let voxels = trainingService.GenerateVoxels (setProgress)
+                let vnode = this.CreateSolidVoxelsNode voxels
+                let mesh = trainingService.GenerateMesh voxels
+                let node = this.CreateSolidMeshNode mesh
                 SCNTransaction.Begin ()
-                match previewNeuralMeshNode with
+                match solidVoxelsNode with
                 | None -> ()
                 | Some x -> x.RemoveFromParentNode ()
-                previewNeuralMeshNode <- Some node
-                rootNode.AddChildNode node
+                solidVoxelsNode <- Some vnode
+                rootNode.AddChildNode vnode
+                match solidMeshNode with
+                | None -> ()
+                | Some x -> x.RemoveFromParentNode ()
+                //solidMeshNode <- Some node
+                //rootNode.AddChildNode node
                 SCNTransaction.Commit ()
             with ex ->
                 this.ShowError ex
@@ -280,3 +263,78 @@ type ProjectViewController (project : Project) =
             k ())
         |> ignore
 
+    member private this.CreateSolidVoxelsNode (voxels : SdfKit.Voxels) : SCNNode =
+        let nx = voxels.NX
+        let ny = voxels.NY
+        let nz = voxels.NZ
+        let m = voxels.Min
+        let dx = (voxels.Max.X - m.X) / float32 (nx - 1)
+        let dy = (voxels.Max.Y - m.Y) / float32 (ny - 1)
+        let dz = (voxels.Max.Z - m.Z) / float32 (nz - 1)
+        let n = nx * ny * nz
+        let vs = voxels.Values
+        if n > 0 then
+            let verts = ResizeArray<SCNVector3> ()
+            for ix in 0..(nx - 1) do
+                let x = m.X + dx * float32 ix
+                for iy in 0..(ny - 1) do
+                    let y = m.Y + dy * float32 iy
+                    for iz in 0..(nz - 1) do
+                        let v = vs.[ix, iy, iz]
+                        if v <= 0.0f then
+                            let z = m.Z + dz * float32 iz
+                            verts.Add (SCNVector3 (x, y, z))
+            let verts = verts.ToArray ()
+            let vertsSource =
+                verts
+                |> SCNGeometrySource.FromVertices
+            let element =
+                let elemStream = new IO.MemoryStream ()
+                let elemWriter = new IO.BinaryWriter (elemStream)
+                for i in 0..(verts.Length - 1) do
+                    elemWriter.Write (i)
+                elemWriter.Flush ()
+                elemStream.Position <- 0L
+                let data = NSData.FromStream (elemStream)
+                SCNGeometryElement.FromData (data, SCNGeometryPrimitiveType.Point, nint verts.Length, nint 4)
+            element.PointSize <- nfloat dx
+            element.MinimumPointScreenSpaceRadius <- nfloat 1.0
+            element.MaximumPointScreenSpaceRadius <- nfloat 10.0
+            let geometry = SCNGeometry.Create([|vertsSource|], [|element|])
+            let material = SCNMaterial.Create ()
+            material.Emission.ContentColor <- UIColor.Green
+            material.ReadsFromDepthBuffer <- true
+            material.WritesToDepthBuffer <- true
+            material.Transparency <- nfloat 0.125
+            geometry.FirstMaterial <- material
+            let node = SCNNode.FromGeometry(geometry)
+            node
+        else
+            SCNNode.Create ()
+
+    member private this.CreateSolidMeshNode (mesh : SdfKit.Mesh) : SCNNode =
+        if mesh.Vertices.Length > 0 && mesh.Triangles.Length > 0 then
+            let vertsSource =
+                mesh.Vertices
+                |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))
+                |> SCNGeometrySource.FromVertices
+            let normsSource =
+                mesh.Normals
+                |> Array.map (fun v -> SCNVector3(-v.X, -v.Y, -v.Z))
+                |> SCNGeometrySource.FromNormals
+            let element =
+                let elemStream = new IO.MemoryStream ()
+                let elemWriter = new IO.BinaryWriter (elemStream)
+                for i in 0..(mesh.Triangles.Length - 1) do
+                    elemWriter.Write (mesh.Triangles.[i])
+                elemWriter.Flush ()
+                elemStream.Position <- 0L
+                let data = NSData.FromStream (elemStream)
+                SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Triangles, nint (mesh.Triangles.Length / 3), nint 4)
+            let geometry = SCNGeometry.Create([|vertsSource;normsSource|], [|element|])
+            let material = SCNMaterial.Create ()
+            material.Diffuse.ContentColor <- UIColor.White
+            geometry.FirstMaterial <- material
+            SCNNode.FromGeometry(geometry)
+        else
+            SCNNode.Create ()

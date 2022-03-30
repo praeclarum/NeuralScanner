@@ -220,8 +220,7 @@ type TrainingService (project : Project) =
             IO.File.Move (tmpPath, trainingModelPath)
             printfn "SAVED MODEL: %s" trainingModelPath
 
-    member this.GenerateMesh (progress : float32 -> unit) =
-
+    member this.GenerateVoxels (progress : float32 -> unit) =
         let nx, ny, nz = project.Settings.ResolutionX, project.Settings.ResolutionY, project.Settings.ResolutionZ
         let mutable numPoints = 0
         let totalPoints = nx*ny*nz
@@ -250,6 +249,16 @@ type TrainingService (project : Project) =
 
         let voxels = SdfKit.Voxels.SampleSdf (sdf, data.VolumeMin, data.VolumeMax, nx, ny, nz, batchSize = batchSize, maxDegreeOfParallelism = 2)
         voxels.ClipToBounds ()
+        voxels
+
+    member this.GenerateMesh (progress : float32 -> unit) =
+        let voxels = this.GenerateVoxels progress
+        voxels.ClipToBounds ()
+        let mesh = SdfKit.MarchingCubes.CreateMesh (voxels, 0.0f, step = 1)
+        //mesh.WriteObj (dataDir + sprintf "/Onewheel_s%d_d%d_c%d_%s_l%d_%d.obj" (int outputScale) (int (1.0f/samplingDistance)) (int (1.0f/lossClipDelta)) (if useTanh then "tanh" else "n") (int (1.0f/learningRate)) trainedPoints)
+        mesh
+
+    member this.GenerateMesh (voxels : SdfKit.Voxels) =
         let mesh = SdfKit.MarchingCubes.CreateMesh (voxels, 0.0f, step = 1)
         //mesh.WriteObj (dataDir + sprintf "/Onewheel_s%d_d%d_c%d_%s_l%d_%d.obj" (int outputScale) (int (1.0f/samplingDistance)) (int (1.0f/lossClipDelta)) (if useTanh then "tanh" else "n") (int (1.0f/learningRate)) trainedPoints)
         mesh
