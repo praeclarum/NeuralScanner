@@ -33,6 +33,22 @@ type ControlTableCell (control : UIView, height : float) =
             |]
     member this.Control = control
 
+type ToggleButton (title : string) =
+    inherit UIButton (UIButtonType.RoundedRect, TranslatesAutoresizingMaskIntoConstraints = false)
+    let selectedConfig = UIButtonConfiguration.FilledButtonConfiguration
+    do selectedConfig.Title <- title
+    let config = UIButtonConfiguration.BorderedButtonConfiguration
+    do config.Title <- title
+    do
+        base.Configuration <- config
+        base.ConfigurationUpdateHandler <- fun b ->
+            printfn "BS %O" b.State
+            if b.State.HasFlag (UIControlState.Selected) then
+                b.Configuration <- selectedConfig
+            else
+                b.Configuration <- config
+        base.SetTitle (title, UIControlState.Normal)
+
 type ValueSlider (label : string, valueFormat : string,
                   minSliderValue : float32, maxSliderValue,
                   sliderToValue : float32 -> float32, valueToSlider : float32 -> float32) =

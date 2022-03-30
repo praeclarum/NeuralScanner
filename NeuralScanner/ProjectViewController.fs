@@ -10,6 +10,11 @@ open SceneKit
 
 open Praeclarum.AutoLayout
 
+[<Flags>]
+type ViewObjectType =
+    | DepthPoints = 1
+    | SolidVoxels = 2
+    | SolidMesh = 4
 
 type ProjectViewController (project : Project) =
     inherit BaseViewController ()
@@ -72,6 +77,15 @@ type ProjectViewController (project : Project) =
 
     let previewProgress = new UIProgressView (Alpha = nfloat 0.0f, TranslatesAutoresizingMaskIntoConstraints = false)
 
+    let viewPointsButton = new ToggleButton ("Points")
+    let viewVoxelsButton = new ToggleButton ("Voxels")
+    let viewSolidMeshButton = new ToggleButton ("Solid Mesh")
+    let viewButtons = new UIStackView (Axis = UILayoutConstraintAxis.Vertical, Spacing = nfloat 11.0, TranslatesAutoresizingMaskIntoConstraints = false)
+    do
+        viewButtons.AddArrangedSubview viewPointsButton
+        viewButtons.AddArrangedSubview viewVoxelsButton
+        viewButtons.AddArrangedSubview viewSolidMeshButton
+
     let scene = SCNScene.Create()
     do sceneView.Scene <- scene
     let rootNode = scene.RootNode
@@ -80,6 +94,8 @@ type ProjectViewController (project : Project) =
     let framePointNodes = ConcurrentDictionary<string, SCNNode> ()
     let mutable solidMeshNode : SCNNode option = None
     let mutable solidVoxelsNode : SCNNode option = None
+
+    let mutable visibleTypes : ViewObjectType = ViewObjectType.DepthPoints ||| ViewObjectType.SolidVoxels ||| ViewObjectType.SolidMesh
 
     member this.HandleCapture () =
         let captureVC = new CaptureViewController (project)
@@ -120,6 +136,9 @@ type ProjectViewController (project : Project) =
         view.AddSubview previewProgress
         view.AddSubview previewButton
         view.AddSubview previewResolutionSlider
+        view.AddSubview viewButtons
+
+        let viewButtonGap = 11.0
 
         [|
             nameField.LayoutTop == previewProgress.LayoutBottom
@@ -145,6 +164,8 @@ type ProjectViewController (project : Project) =
             previewProgress.LayoutHeight == 4
             previewProgress.LayoutLeft == view.SafeAreaLayoutGuide.LayoutLeft
             previewProgress.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight
+            viewButtons.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop + 44.0
+            viewButtons.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11.0
         |]
 
     override this.UpdateUI () =
@@ -162,6 +183,36 @@ type ProjectViewController (project : Project) =
             learningRateSlider.Value <- project.Settings.LearningRate
         if not previewResolutionSlider.UserInteracting then
             previewResolutionSlider.Value <- float32 project.Settings.ResolutionX
+
+        if visibleTypes.HasFlag (ViewObjectType.DepthPoints) then
+            pointCloudNode.Hidden <- false
+            viewPointsButton.Selected <- true
+        else
+            pointCloudNode.Hidden <- true
+            viewPointsButton.Selected <- false
+        viewPointsButton.Enabled <- project.NumCaptures > 0
+
+        if visibleTypes.HasFlag (ViewObjectType.SolidVoxels) then
+            viewVoxelsButton.Selected <- true
+            match solidVoxelsNode with
+            | None -> viewVoxelsButton.Enabled <- false
+            | Some x -> x.Hidden <- false; viewVoxelsButton.Enabled <- true
+        else
+            viewVoxelsButton.Selected <- false
+            match solidVoxelsNode with
+            | None -> viewVoxelsButton.Enabled <- false
+            | Some x -> x.Hidden <- true; viewVoxelsButton.Enabled <- true
+        if visibleTypes.HasFlag (ViewObjectType.SolidMesh) then
+            viewSolidMeshButton.Selected <- true
+            match solidMeshNode with
+            | None -> viewSolidMeshButton.Enabled <- false
+            | Some x -> x.Hidden <- false; viewSolidMeshButton.Enabled <- true
+        else
+            viewSolidMeshButton.Selected <- false
+            match solidMeshNode with
+            | None -> viewSolidMeshButton.Enabled <- false
+            | Some x -> x.Hidden <- true; viewSolidMeshButton.Enabled <- true
+
         Threading.ThreadPool.QueueUserWorkItem (fun _ -> this.UpdatePointCloud ()) |> ignore
 
     override this.SubscribeUI () =
@@ -208,13 +259,27 @@ type ProjectViewController (project : Project) =
                 this.GeneratePreviewMesh (fun () ->
                     if wasTraining then
                         trainingService.Run ()
-                        this.BeginInvokeOnMainThread (fun _ -> this.UpdateUI ())))
+                    this.BeginInvokeOnMainThread (fun _ -> this.UpdateUI ())))
+
+            viewPointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.DepthPoints))
+            viewVoxelsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.SolidVoxels))
+            viewSolidMeshButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.SolidMesh))
         |]
 
     [<Export("showProjectSettings:")>]
     member this.ShowProjectSettings (sender : NSObject) =
         let vc = new ProjectSettingsViewController (project)
         this.PresentPopover (vc, this.SettingsButton)
+
+    member this.ToggleVisible (o : ViewObjectType) =
+        if visibleTypes.HasFlag o then
+            this.SetVisible (visibleTypes &&& ~~~o)
+        else
+            this.SetVisible (visibleTypes ||| o)
+
+    member this.SetVisible (os : ViewObjectType) =
+        visibleTypes <- os
+        this.UpdateUI ()
 
     member this.UpdatePointCloud () =
         SCNTransaction.Begin ()
@@ -243,8 +308,10 @@ type ProjectViewController (project : Project) =
             try
                 let voxels = trainingService.GenerateVoxels (setProgress)
                 let vnode = this.CreateSolidVoxelsNode voxels
+                vnode.Hidden <- not (visibleTypes.HasFlag (ViewObjectType.SolidVoxels))
                 let mesh = trainingService.GenerateMesh voxels
                 let node = this.CreateSolidMeshNode mesh
+                node.Hidden <- not (visibleTypes.HasFlag (ViewObjectType.SolidMesh))
                 SCNTransaction.Begin ()
                 match solidVoxelsNode with
                 | None -> ()
@@ -254,8 +321,8 @@ type ProjectViewController (project : Project) =
                 match solidMeshNode with
                 | None -> ()
                 | Some x -> x.RemoveFromParentNode ()
-                //solidMeshNode <- Some node
-                //rootNode.AddChildNode node
+                solidMeshNode <- Some node
+                rootNode.AddChildNode node
                 SCNTransaction.Commit ()
             with ex ->
                 this.ShowError ex
