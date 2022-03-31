@@ -118,13 +118,15 @@ type SdfFrame (depthPath : string) =
 
     let mutable inboundIndices = [||]
 
+    let minConfidence = 2uy
+
     let pointCoords =
         lazy
             let points = ResizeArray<SceneKit.SCNVector3>()
             for x in 0..(width-1) do
                 for y in 0..(height-1) do
                     let i = index x y
-                    if confidences.[i] > 0uy then
+                    if confidences.[i] >= minConfidence then
                         let p = worldPosition x y 0.0f
                         points.Add (SceneKit.SCNVector3(p.X, p.Y, p.Z))
             points.ToArray ()
@@ -163,7 +165,7 @@ type SdfFrame (depthPath : string) =
             for x in sx..ex do
                 for y in sy..ey do
                     let i = index x y
-                    if confidences.[i] > 0uy then
+                    if confidences.[i] >= minConfidence then
                         let p = worldPosition x y 0.0f
                         sum <- Vector3 (sum.X + p.X, sum.Y + p.Y, sum.Z + p.Z)
                         n <- n + 1
@@ -178,7 +180,7 @@ type SdfFrame (depthPath : string) =
             for x in 0..(width-1) do
                 for y in 0..(height-1) do
                     let i = index x y
-                    if confidences.[i] > 0uy then
+                    if confidences.[i] >= minConfidence then
                         let p = worldPosition x y 0.0f
                         if n = 0 then
                             minv <- Vector3(p.X, p.Y, p.Z)
@@ -200,7 +202,7 @@ type SdfFrame (depthPath : string) =
         for x in 0..(width-1) do
             for y in 0..(height-1) do
                 let i = index x y
-                if confidences.[i] > 0uy then
+                if confidences.[i] >= minConfidence then
                     let p = worldPosition x y 0.0f
                     if p.X >= min.X && p.Y >= min.Y && p.Z >= min.Z &&
                        p.X <= max.X && p.Y <= max.Y && p.Z <= max.Z then
