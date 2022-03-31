@@ -383,31 +383,34 @@ type ProjectViewController (project : Project) =
                         if v <= 0.0f then
                             let z = m.Z + dz * float32 iz
                             verts.Add (SCNVector3 (x, y, z))
-            let verts = verts.ToArray ()
-            let vertsSource =
-                verts
-                |> SCNGeometrySource.FromVertices
-            let element =
-                let elemStream = new IO.MemoryStream ()
-                let elemWriter = new IO.BinaryWriter (elemStream)
-                for i in 0..(verts.Length - 1) do
-                    elemWriter.Write (i)
-                elemWriter.Flush ()
-                elemStream.Position <- 0L
-                let data = NSData.FromStream (elemStream)
-                SCNGeometryElement.FromData (data, SCNGeometryPrimitiveType.Point, nint verts.Length, nint 4)
-            element.PointSize <- nfloat dx
-            element.MinimumPointScreenSpaceRadius <- nfloat 1.0
-            element.MaximumPointScreenSpaceRadius <- nfloat 10.0
-            let geometry = SCNGeometry.Create([|vertsSource|], [|element|])
-            let material = SCNMaterial.Create ()
-            material.Emission.ContentColor <- UIColor.Green
-            material.ReadsFromDepthBuffer <- true
-            material.WritesToDepthBuffer <- true
-            material.Transparency <- nfloat 0.125
-            geometry.FirstMaterial <- material
-            let node = SCNNode.FromGeometry(geometry)
-            node
+            if verts.Count = 0 then
+                SCNNode.Create ()
+            else
+                let verts = verts.ToArray ()
+                let vertsSource =
+                    verts
+                    |> SCNGeometrySource.FromVertices
+                let element =
+                    let elemStream = new IO.MemoryStream ()
+                    let elemWriter = new IO.BinaryWriter (elemStream)
+                    for i in 0..(verts.Length - 1) do
+                        elemWriter.Write (i)
+                    elemWriter.Flush ()
+                    elemStream.Position <- 0L
+                    let data = NSData.FromStream (elemStream)
+                    SCNGeometryElement.FromData (data, SCNGeometryPrimitiveType.Point, nint verts.Length, nint 4)
+                element.PointSize <- nfloat dx
+                element.MinimumPointScreenSpaceRadius <- nfloat 1.0
+                element.MaximumPointScreenSpaceRadius <- nfloat 10.0
+                let geometry = SCNGeometry.Create([|vertsSource|], [|element|])
+                let material = SCNMaterial.Create ()
+                material.Emission.ContentColor <- UIColor.Green
+                material.ReadsFromDepthBuffer <- true
+                material.WritesToDepthBuffer <- true
+                material.Transparency <- nfloat 0.125
+                geometry.FirstMaterial <- material
+                let node = SCNNode.FromGeometry(geometry)
+                node
         else
             SCNNode.Create ()
 
