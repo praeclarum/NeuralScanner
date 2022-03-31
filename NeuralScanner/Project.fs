@@ -9,7 +9,7 @@ open MetalTensors
 module ProjectDefaults =
     let learningRate = 5.0e-4f
     let resolution = 32.0f
-
+    let clipScale = 0.5f
 
 type Project (settings : ProjectSettings, projectDir : string) =
     
@@ -41,9 +41,8 @@ type Project (settings : ProjectSettings, projectDir : string) =
     member this.ClipTransform =
         let st = SCNMatrix4.Scale (this.Settings.ClipScale.X, this.Settings.ClipScale.Y, this.Settings.ClipScale.Z)
         let tt = SCNMatrix4.CreateTranslation (this.Settings.ClipTranslation.X, this.Settings.ClipTranslation.Y, this.Settings.ClipTranslation.Z)
-        let rt = SCNMatrix4.CreateRotationY (this.Settings.ClipRotationDegrees.Y * (180.0f / MathF.PI))
+        let rt = SCNMatrix4.CreateRotationY (this.Settings.ClipRotationDegrees.Y * (MathF.PI / 180.0f))
         st * rt * tt
-
 
     override this.ToString () = sprintf "Project %s" this.Name
 
@@ -125,7 +124,7 @@ module ProjectManager =
                                              ProjectDefaults.learningRate,
                                              DateTime.UtcNow,
                                              ProjectDefaults.resolution,
-                                             Vector3.One,
+                                             Vector3.One * ProjectDefaults.clipScale,
                                              Vector3.Zero,
                                              Vector3.Zero
                                             )

@@ -100,7 +100,7 @@ type ProjectViewController (project : Project) =
     let camNode = SCNNode.Create ()
     do
         camNode.Camera <- cam
-        let mutable t =  SCNMatrix4.LookAt (2.0f, 3.0f, 5.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f)
+        let mutable t =  SCNMatrix4.LookAt (1.0f, 2.0f, 3.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f)
         t.Invert ()
         camNode.Transform <- t
         rootNode.AddChildNode camNode
@@ -209,7 +209,8 @@ type ProjectViewController (project : Project) =
             previewResolutionSlider.Value <- project.Settings.Resolution
 
         if visibleTypes.HasFlag (ViewObjectType.Bounds) then
-            boundsNode.Transform <- project.ClipTransform
+            let t = project.ClipTransform
+            boundsNode.Transform <- t
             boundsNode.Hidden <- false
             viewBoundsButton.Selected <- true
         else

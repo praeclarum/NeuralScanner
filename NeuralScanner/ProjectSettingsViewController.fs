@@ -17,13 +17,14 @@ type ProjectSettingsViewController (project : Project) =
     let resolution = new ValueSliderTableCell ("Resolution", "0", 10.0f, 1000.0f, id, id)
 
     let minSize = 0.1f
-    let maxSize = 10.0f
+    let maxSize = 5.0f
+    let moveSize = 2.0f
     let width = new ValueSliderTableCell ("Width", "0.000", minSize, maxSize, id, id)
     let height = new ValueSliderTableCell ("Height", "0.000", minSize, maxSize, id, id)
     let depth = new ValueSliderTableCell ("Depth", "0.000", minSize, maxSize, id, id)
-    let posX = new ValueSliderTableCell ("Center X", "0.000", -maxSize, maxSize, id, id)
-    let posY = new ValueSliderTableCell ("Center Y", "0.000", -maxSize, maxSize, id, id)
-    let posZ = new ValueSliderTableCell ("Center Z", "0.000", -maxSize, maxSize, id, id)
+    let posX = new ValueSliderTableCell ("Center X", "0.000", -moveSize, moveSize, id, id)
+    let posY = new ValueSliderTableCell ("Center Y", "0.000", -moveSize, moveSize, id, id)
+    let posZ = new ValueSliderTableCell ("Center Z", "0.000", -moveSize, moveSize, id, id)
     let rotY = new ValueSliderTableCell ("Rotation", "0.000", -180.0f, 180.0f, id, id)
 
     override this.ViewDidLoad () =
