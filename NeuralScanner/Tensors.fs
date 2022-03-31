@@ -108,6 +108,15 @@ type SdfFrame (depthPath : string) =
         //let testResult = Vector4.Transform(Vector4.UnitW, transform)
         Vector4.Transform(camPos, transform)
 
+    let mutable clipTransform = transform
+
+    let clipPosition (x : int) (y : int) depthOffset : Vector4 =
+        let camPos = cameraPosition x y depthOffset
+        // World = Transform * Camera
+        // World = Camera * Transform'
+        //let testResult = Vector4.Transform(Vector4.UnitW, transform)
+        Vector4.Transform(camPos, clipTransform)
+
     let centerPos = worldPosition (width/2) (height/2) 0.0f
 
     do printfn "FRAME %s center=%g, %g, %g" (IO.Path.GetFileName(depthPath)) centerPos.X centerPos.Y centerPos.Z
@@ -206,6 +215,19 @@ type SdfFrame (depthPath : string) =
                     let p = worldPosition x y 0.0f
                     if p.X >= min.X && p.Y >= min.Y && p.Z >= min.Z &&
                        p.X <= max.X && p.Y <= max.Y && p.Z <= max.Z then
+                        inbounds.Add(i)
+        inboundIndices <- inbounds.ToArray ()
+
+    member this.SetBoundsInverseTransform (itransform : Matrix4x4) =
+        clipTransform <- transform * itransform
+        let inbounds = ResizeArray<_>()
+        for x in 0..(width-1) do
+            for y in 0..(height-1) do
+                let i = index x y
+                if confidences.[i] >= minConfidence then
+                    let p = clipPosition x y 0.0f
+                    if p.X >= -1.0f && p.Y >= -1.0f && p.Z >= -1.0f &&
+                       p.X <= 1.0f && p.Y <= 1.0f && p.Z <= 1.0f then
                         inbounds.Add(i)
         inboundIndices <- inbounds.ToArray ()
 

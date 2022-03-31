@@ -28,20 +28,24 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         let m = -1.0e6f*Vector3.One
         frames |> Array.fold (fun a x -> Vector3.Max (x.MaxPoint, a)) m
 
-    let meanCenter =
-        if count > 0 then (frames |> Array.sumBy (fun x -> x.CenterPoint)) / float32 count
-        else Vector3.Zero
+    let meanCenter = project.Settings.ClipTranslation
     let volumeMin, volumeMax =
-        let rmin = meanCenter - framesMin
-        let rmax = framesMax - meanCenter
-        let r = Vector3.Min (rmin, rmax)
-        let vmin = Vector3.Max (framesMin - 0.01f * Vector3.One, meanCenter - r)
-        let vmax = Vector3.Min (framesMax + 0.01f * Vector3.One, meanCenter + r)
+        let vmin = meanCenter - project.Settings.ClipScale
+        let vmax = meanCenter + project.Settings.ClipScale
         vmin, vmax
         
     let volumeCenter = (volumeMin + volumeMax) * 0.5f
 
-    do for f in frames do f.FindInBoundPoints(volumeMin, volumeMax)
+    //do for f in frames do f.FindInBoundPoints(volumeMin, volumeMax)
+    do
+        let mutable itr = project.ClipTransform
+        itr.Invert ()
+        let itr4 = Matrix4x4(itr.M11, itr.M12, itr.M13, itr.M14,
+                             itr.M21, itr.M22, itr.M23, itr.M24,
+                             itr.M31, itr.M32, itr.M33, itr.M34,
+                             itr.M41, itr.M42, itr.M43, itr.M44)
+        for f in frames do
+            f.SetBoundsInverseTransform itr4
 
     member this.VolumeMin = volumeMin
     member this.VolumeMax = volumeMax
