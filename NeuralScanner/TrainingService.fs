@@ -37,17 +37,26 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         
     let volumeCenter = (volumeMin + volumeMax) * 0.5f
 
+    let occupancy = AxisOccupancy.Create 16
+
     //do for f in frames do f.FindInBoundPoints(volumeMin, volumeMax)
     let inverseClipTransform =
-        let mutable itr = project.ClipTransform
+        let tr = project.ClipTransform
+        let tr4 = Matrix4x4(tr.M11, tr.M12, tr.M13, tr.M14,
+                            tr.M21, tr.M22, tr.M23, tr.M24,
+                            tr.M31, tr.M32, tr.M33, tr.M34,
+                            tr.M41, tr.M42, tr.M43, tr.M44)
+        let mutable itr = tr
         itr.Invert ()
         let itr4 = Matrix4x4(itr.M11, itr.M12, itr.M13, itr.M14,
                              itr.M21, itr.M22, itr.M23, itr.M24,
                              itr.M31, itr.M32, itr.M33, itr.M34,
                              itr.M41, itr.M42, itr.M43, itr.M44)
         for f in frames do
-            f.SetBoundsInverseTransform itr4
+            f.SetBoundsInverseTransform (itr4, tr4, occupancy)
         itr4
+
+    let unoccupied = occupancy.GetUnoccupied ()
 
     let createBatchData () : BatchTrainingData =
         {
@@ -70,7 +79,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
     override this.GetRow (index, _) =
         let inside = (index % 2) = 0
         let fi = StaticRandom.Next(frames.Length)
-        let struct (i, o) = frames.[fi].GetRow (inside, volumeCenter, samplingDistance, outputScale, batchData)
+        let struct (i, o) = frames.[fi].GetRow (inside, volumeCenter, samplingDistance, outputScale, unoccupied, occupancy.NumCells, batchData)
         //printfn "ROW%A D%A = %A" index inside i.[2].[0]
         struct (i, o)
 

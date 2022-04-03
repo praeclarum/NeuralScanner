@@ -140,14 +140,15 @@ type SdfFrame (depthPath : string) =
         //let testResult = Vector4.Transform(Vector4.UnitW, transform)
         Vector4.Transform(camPos, transform)
 
-    let mutable clipTransform = transform
+    let mutable camToClipTransform = transform
+    let mutable clipToWorldTransform = transform
 
     let clipPosition (x : int) (y : int) depthOffset : Vector4 =
         let camPos = cameraPosition x y depthOffset
         // World = Transform * Camera
         // World = Camera * Transform'
         //let testResult = Vector4.Transform(Vector4.UnitW, transform)
-        Vector4.Transform(camPos, clipTransform)
+        Vector4.Transform(camPos, camToClipTransform)
 
     let centerPos = worldPosition (width/2) (height/2) 0.0f
 
@@ -219,10 +220,23 @@ type SdfFrame (depthPath : string) =
         let mutable samplePos = clipPosition x y (sampleDepth - depth)
         let mutable n = 0
         while n < 5 && ((abs samplePos.X) > 1.1f || (abs samplePos.Y) > 1.1f || abs samplePos.Z > 1.1f) do
-            sampleDepth <- (sampleDepth + depth) * 0.5f
+            sampleDepth <- 0.25f*sampleDepth + 0.75f*depth
             samplePos <- clipPosition x y (sampleDepth - depth)
             n <- n + 1
         sampleDepth - depth
+
+    let getRandomCellPoint (i : int) (numOccCells : int) =
+        let d = 2.0f / float32 numOccCells
+        let m = float32 i * 2.0f / float32 numOccCells - 1.0f
+        m + d * (float32 (StaticRandom.NextDouble ()))
+
+    let getRandomUnoccupiedClipPoint (unoccupied : OpenTK.Vector3i[]) (numOccCells : int) : Vector4 =
+        let ui = StaticRandom.Next (unoccupied.Length)
+        let clipIndex = unoccupied.[ui]
+        let clipX = getRandomCellPoint clipIndex.X numOccCells
+        let clipY = getRandomCellPoint clipIndex.Y numOccCells
+        let clipZ = getRandomCellPoint clipIndex.Z numOccCells
+        Vector4 (clipX, clipY, clipZ, 1.0f)
 
     member this.DepthPath = depthPath
 
@@ -242,8 +256,9 @@ type SdfFrame (depthPath : string) =
                         inbounds.Add(i)
         inboundIndices <- inbounds.ToArray ()
 
-    member this.SetBoundsInverseTransform (itransform : Matrix4x4) =
-        clipTransform <- transform * itransform
+    member this.SetBoundsInverseTransform (newWorldToClipTransform : Matrix4x4, newClipToWorldTransform : Matrix4x4, occupancy : AxisOccupancy) =
+        camToClipTransform <- transform * newWorldToClipTransform
+        clipToWorldTransform <- newClipToWorldTransform
         let inbounds = ResizeArray<_>()
         for x in 0..(width-1) do
             for y in 0..(height-1) do
@@ -252,45 +267,59 @@ type SdfFrame (depthPath : string) =
                     let p = clipPosition x y 0.0f
                     if p.X >= -1.0f && p.Y >= -1.0f && p.Z >= -1.0f &&
                        p.X <= 1.0f && p.Y <= 1.0f && p.Z <= 1.0f then
+                        occupancy.AddPoint (p.X, p.Y, p.Z)
                         inbounds.Add(i)
         inboundIndices <- inbounds.ToArray ()
 
     member this.PointCount = inboundIndices.Length
 
-    member this.GetRow (inside: bool, poi : Vector3, samplingDistance : float32, outputScale : float32, batchData : BatchTrainingData) : struct (Tensor[]*Tensor[]) =
+    member this.GetRow (inside: bool, poi : Vector3, samplingDistance : float32, outputScale : float32, unoccupied : OpenTK.Vector3i[], numOccCells : int, batchData : BatchTrainingData) : struct (Tensor[]*Tensor[]) =
         // i = y * width + x
         let index = inboundIndices.[StaticRandom.Next(inboundIndices.Length)]
         let x = index % width
         let y = index / width
 
         // Half the time inside, half outside
-        let depthOffset, free =
-            if inside then
-                // Inside Surface
-                abs (randn () * samplingDistance), 0.0f
+        let clipPos, outputSignedDistance, free =
+            let isFree = not inside && (StaticRandom.Next (2) = 1)
+            let useUnoccupied = isFree && (StaticRandom.Next (100) < 50)
+            if useUnoccupied then
+                let cp = getRandomUnoccupiedClipPoint unoccupied numOccCells
+                let wpos = Vector4.Transform (cp, clipToWorldTransform)
+                let swpos = SCNVector3 (wpos.X, wpos.Y, wpos.Z)
+                batchData.FreespacePoints.Add swpos
+                cp, 0.1f * outputScale, 1.0f
             else
-                // Outside
-                if StaticRandom.Next(2) = 0 then
-                    // Ouside Surface
-                    -abs (randn () * samplingDistance), 0.0f
+                let depthOffset, free =
+                    if inside then
+                        // Inside Surface
+                        abs (randn () * samplingDistance), 0.0f
+                    else
+                        // Outside
+                        if not isFree then
+                            // Ouside Surface
+                            -abs (randn () * samplingDistance), 0.0f
+                        else
+                            // Freespace
+                            let depth = depths.[index]
+                            getRandomFreespaceDepthOffset depth x y poi, 1.0f
+
+                let wpos = worldPosition x y depthOffset
+                let swpos = SCNVector3 (wpos.X, wpos.Y, wpos.Z)
+                if depthOffset >= 0.0f then
+                    batchData.InsideSurfacePoints.Add swpos
+                elif free > 0.5f then
+                    batchData.FreespacePoints.Add swpos
                 else
-                    // Freespace
-                    let depth = depths.[index]
-                    getRandomFreespaceDepthOffset depth x y poi, 1.0f
+                    batchData.OutsideSurfacePoints.Add swpos
 
-        let wpos = worldPosition x y depthOffset
-        let swpos = SCNVector3 (wpos.X, wpos.Y, wpos.Z)
-        if depthOffset >= 0.0f then
-            batchData.InsideSurfacePoints.Add swpos
-        elif free > 0.5f then
-            batchData.FreespacePoints.Add swpos
-        else
-            batchData.OutsideSurfacePoints.Add swpos
+                //let pos = wpos - Vector4(poi, 1.0f)
+                let clipPos = clipPosition x y depthOffset
+                let outputSignedDistance = -depthOffset * outputScale
+                clipPos, outputSignedDistance, free
 
-        //let pos = wpos - Vector4(poi, 1.0f)
-        let pos = clipPosition x y depthOffset
-        let outputSignedDistance = -depthOffset * outputScale
-        let inputs = [| Tensor.Array (vector4Shape, pos.X, pos.Y, pos.Z, 1.0f)
+
+        let inputs = [| Tensor.Array (vector4Shape, clipPos.X, clipPos.Y, clipPos.Z, 1.0f)
                         Tensor.Constant (free, freespaceShape)
                         Tensor.Constant (outputSignedDistance, distanceShape) |]
         struct (inputs, [| |])
@@ -312,4 +341,44 @@ and BatchTrainingData =
         FreespacePoints : ResizeArray<SCNVector3>
     }
 
-
+and AxisOccupancy =
+    {
+        XAxis : bool[,]
+        YAxis : bool[,]
+        ZAxis : bool[,]
+    }
+    static member Create (n : int) =
+        {
+            XAxis = Array2D.zeroCreate n n
+            YAxis = Array2D.zeroCreate n n
+            ZAxis = Array2D.zeroCreate n n
+        }
+    member this.NumCells = this.ZAxis.GetLength (0)
+    member this.AddPoint (clipX : float32, clipY : float32, clipZ : float32) =
+        let n = this.NumCells
+        let s = float32 n / 2.0f
+        let xi = int ((clipX + 1.0f) * s)
+        let yi = int ((clipY + 1.0f) * s)
+        let zi = int ((clipZ + 1.0f) * s)
+        if 0 <= xi && xi < n && 0 <= yi && yi < n && 0 <= zi && zi < n then
+            this.XAxis.[yi, zi] <- true
+            this.YAxis.[zi, xi] <- true
+            this.ZAxis.[xi, yi] <- true
+        ()
+    member this.GetUnoccupied () : OpenTK.Vector3i[] =
+        let n = this.NumCells
+        //let occ = ResizeArray<OpenTK.Vector3i> (n*n*n)
+        let unocc = ResizeArray<OpenTK.Vector3i> (n*n*n)
+        for xi in 0..(n - 1) do
+            for yi in 0..(n - 1) do
+                if this.ZAxis.[xi, yi] then
+                    for zi in 0..(n - 1) do
+                        if this.XAxis.[yi, zi] && this.YAxis.[zi, xi] then
+                            //occ.Add (OpenTK.Vector3i (xi, yi, zi))
+                            ()
+                        else
+                            unocc.Add (OpenTK.Vector3i (xi, yi, zi))
+                else
+                    for zi in 0..(n - 1) do
+                        unocc.Add (OpenTK.Vector3i (xi, yi, zi))
+        unocc.ToArray ()

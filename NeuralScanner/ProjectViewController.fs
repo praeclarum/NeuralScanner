@@ -488,9 +488,15 @@ type ProjectViewController (project : Project) =
     member this.HandleBatchData (batchData : BatchTrainingData) =
         let inNode = SceneKitGeometry.createPointCloudNode  UIColor.SystemRed (batchData.InsideSurfacePoints.ToArray()) 
         let outNode = SceneKitGeometry.createPointCloudNode UIColor.SystemGreen (batchData.OutsideSurfacePoints.ToArray()) 
-        let freeNode = SceneKitGeometry.createPointCloudNode UIColor.SystemBlue (batchData.FreespacePoints.ToArray()) 
+        let freeNode = SceneKitGeometry.createPointCloudNode UIColor.SystemBlue (batchData.FreespacePoints.ToArray())
+        let addNode (parent : SCNNode) n =
+            let cs = parent.ChildNodes
+            if cs.Length > 10 then
+                cs.[0].RemoveFromParentNode ()
+            parent.AddChildNode n
         SCNTransaction.Begin ()
-        insidePointsNode.AddChildNode inNode
-        outsidePointsNode.AddChildNode outNode
-        freespacePointsNode.AddChildNode freeNode
+        addNode insidePointsNode inNode
+        addNode outsidePointsNode outNode
+        addNode freespacePointsNode freeNode
         SCNTransaction.Commit ()
+
