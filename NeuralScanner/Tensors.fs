@@ -279,7 +279,6 @@ type SdfFrame (depthPath : string) =
                     getRandomFreespaceDepthOffset depth x y poi, 1.0f
 
         let wpos = worldPosition x y depthOffset
-
         let swpos = SCNVector3 (wpos.X, wpos.Y, wpos.Z)
         if depthOffset >= 0.0f then
             batchData.InsideSurfacePoints.Add swpos
@@ -288,7 +287,8 @@ type SdfFrame (depthPath : string) =
         else
             batchData.OutsideSurfacePoints.Add swpos
 
-        let pos = wpos - Vector4(poi, 1.0f)
+        //let pos = wpos - Vector4(poi, 1.0f)
+        let pos = clipPosition x y depthOffset
         let outputSignedDistance = -depthOffset * outputScale
         let inputs = [| Tensor.Array (vector4Shape, pos.X, pos.Y, pos.Z, 1.0f)
                         Tensor.Constant (free, freespaceShape)

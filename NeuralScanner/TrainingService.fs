@@ -38,7 +38,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
     let volumeCenter = (volumeMin + volumeMax) * 0.5f
 
     //do for f in frames do f.FindInBoundPoints(volumeMin, volumeMax)
-    do
+    let inverseClipTransform =
         let mutable itr = project.ClipTransform
         itr.Invert ()
         let itr4 = Matrix4x4(itr.M11, itr.M12, itr.M13, itr.M14,
@@ -47,6 +47,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
                              itr.M41, itr.M42, itr.M43, itr.M44)
         for f in frames do
             f.SetBoundsInverseTransform itr4
+        itr4
 
     let createBatchData () : BatchTrainingData =
         {
@@ -56,11 +57,15 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         }
     let mutable batchData = createBatchData ()
 
+    member this.ClipWorldPoint (worldPoint : Vector3) =
+        Vector4.Transform (worldPoint, inverseClipTransform)
+
     member this.VolumeMin = volumeMin
     member this.VolumeMax = volumeMax
     member this.VolumeCenter = volumeCenter
 
     override this.Count = frames |> Array.sumBy (fun x -> x.PointCount)
+
 
     override this.GetRow (index, _) =
         let inside = (index % 2) = 0
@@ -256,7 +261,8 @@ type TrainingService (project : Project) =
             let batchTensors = tapool.Rent n
             let x = x.Span
             for i in 0..(n - 1) do
-                let p = x.[i] - data.VolumeCenter
+                //let p = x.[i] - data.VolumeCenter
+                let p = data.ClipWorldPoint x.[i]
                 let input = Tensor.Array(p.X, p.Y, p.Z, 1.0f)
                 let inputs = tpool.Rent 1
                 inputs.[0] <- input
