@@ -7,6 +7,7 @@ open System.IO
 open System.Numerics
 open System.Globalization
 
+open SceneKit
 open MetalTensors
 
 type SdfDataSet (project : Project, samplingDistance : float32, outputScale : float32) =
@@ -47,6 +48,14 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         for f in frames do
             f.SetBoundsInverseTransform itr4
 
+    let createBatchData () : BatchTrainingData =
+        {
+            InsideSurfacePoints = ResizeArray<SCNVector3> ()
+            OutsideSurfacePoints = ResizeArray<SCNVector3> ()
+            FreespacePoints = ResizeArray<SCNVector3> ()
+        }
+    let mutable batchData = createBatchData ()
+
     member this.VolumeMin = volumeMin
     member this.VolumeMax = volumeMax
     member this.VolumeCenter = volumeCenter
@@ -56,9 +65,14 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
     override this.GetRow (index, _) =
         let inside = (index % 2) = 0
         let fi = StaticRandom.Next(frames.Length)
-        let struct (i, o) = frames.[fi].GetRow (inside, volumeCenter, samplingDistance, outputScale)
+        let struct (i, o) = frames.[fi].GetRow (inside, volumeCenter, samplingDistance, outputScale, batchData)
         //printfn "ROW%A D%A = %A" index inside i.[2].[0]
         struct (i, o)
+
+    member this.PopLastTrainingData () =
+        let b = batchData
+        batchData <- createBatchData ()
+        b
 
 
 type TrainingService (project : Project) =
@@ -85,6 +99,7 @@ type TrainingService (project : Project) =
     // Derived parameters
 
     let batchTrained = Event<_> ()
+    let newBatchData = Event<_> ()
 
     let weightsInit = WeightsInit.Default//.GlorotUniform (0.54f) //.Uniform (-0.02f, 0.02f)
 
@@ -183,28 +198,30 @@ type TrainingService (project : Project) =
     member this.Losses = losses.ToArray ()
 
     member this.BatchTrained = batchTrained.Publish
+    member this.NewBatchData = newBatchData.Publish
 
     member private this.Train (cancel : Threading.CancellationToken) =
         //let data = SdfDataSet ("/Users/fak/Data/NeuralScanner/Onewheel")
         //let struct(inputs, outputs) = data.GetRow(0, null)
         let mutable totalTrained = 0
-        let callback (h : TrainingHistory.BatchHistory) =
-            //printfn "LOSS %g" h.AverageLoss
-            h.ContinueTraining <- not cancel.IsCancellationRequested
-            totalTrained <- batchSize + totalTrained
-            let loss = h.AverageLoss
-            losses.Add (loss)
-            batchTrained.Trigger (batchSize, totalTrained, loss)
 
         try
             let trainingModel = getTrainingModel ()
             printfn "%O" trainingModel
-            let data = data.Value
+            let dataSource = data.Value
+            let callback (h : TrainingHistory.BatchHistory) =
+                //printfn "LOSS %g" h.AverageLoss
+                h.ContinueTraining <- not cancel.IsCancellationRequested
+                totalTrained <- batchSize + totalTrained
+                let loss = h.AverageLoss
+                losses.Add (loss)
+                batchTrained.Trigger (batchSize, totalTrained, loss)
+                newBatchData.Trigger (dataSource.PopLastTrainingData ())
             optimizer.LearningRate <- project.Settings.LearningRate
             //this.GenerateMesh ()
             let mutable epoch = 0
             while not cancel.IsCancellationRequested && epoch < numEpochs do
-                let history = trainingModel.Fit (data, batchSize = batchSize, epochs = 1.0f, callback = fun h -> callback h)
+                let history = trainingModel.Fit (dataSource, batchSize = batchSize, epochs = 1.0f, callback = fun h -> callback h)
                 trainedPoints <- trainedPoints + history.Batches.Length * batchSize
                 epoch <- epoch + 1
         with ex ->

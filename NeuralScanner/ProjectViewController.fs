@@ -16,6 +16,9 @@ type ViewObjectType =
     | SolidVoxels = 2
     | SolidMesh = 4
     | Bounds = 8
+    | InsidePoints = 16
+    | OutsidePoints = 32
+    | FreespacePoints = 64
 
 type ProjectViewController (project : Project) =
     inherit BaseViewController ()
@@ -80,12 +83,18 @@ type ProjectViewController (project : Project) =
 
     let viewBoundsButton = new ToggleButton ("Bounds")
     let viewPointsButton = new ToggleButton ("Points")
+    let viewInsidePointsButton = new ToggleButton ("Inside")
+    let viewOutsidePointsButton = new ToggleButton ("Outside")
+    let viewFreespacePointsButton = new ToggleButton ("Freespace")
     let viewVoxelsButton = new ToggleButton ("Voxels")
     let viewSolidMeshButton = new ToggleButton ("Solid Mesh")
     let viewButtons = new UIStackView (Axis = UILayoutConstraintAxis.Vertical, Spacing = nfloat 11.0, TranslatesAutoresizingMaskIntoConstraints = false)
     do
         viewButtons.AddArrangedSubview viewBoundsButton
         viewButtons.AddArrangedSubview viewPointsButton
+        viewButtons.AddArrangedSubview viewInsidePointsButton
+        viewButtons.AddArrangedSubview viewOutsidePointsButton
+        viewButtons.AddArrangedSubview viewFreespacePointsButton
         viewButtons.AddArrangedSubview viewVoxelsButton
         viewButtons.AddArrangedSubview viewSolidMeshButton
 
@@ -107,6 +116,11 @@ type ProjectViewController (project : Project) =
     //    sceneView.PointOfView <- camNode
     let pointCloudNode = new SCNNode (Name = "PointCloud")
     do rootNode.AddChildNode pointCloudNode
+    let insidePointsNode = new SCNNode (Name = "InsidePoints")
+    let outsidePointsNode = new SCNNode (Name = "OutsidePoints")
+    let freespacePointsNode = new SCNNode (Name = "FreespacePoints")
+    do rootNode.AddNodes [| insidePointsNode; outsidePointsNode; freespacePointsNode |]
+
     let framePointNodes = ConcurrentDictionary<string, SCNNode> ()
     let mutable solidMeshNode : SCNNode option = None
     let mutable solidVoxelsNode : SCNNode option = None
@@ -119,7 +133,14 @@ type ProjectViewController (project : Project) =
         n
     do rootNode.AddChildNode boundsNode
 
-    let mutable visibleTypes : ViewObjectType = ViewObjectType.Bounds ||| ViewObjectType.DepthPoints ||| ViewObjectType.SolidVoxels ||| ViewObjectType.SolidMesh
+    let mutable visibleTypes : ViewObjectType =
+        ViewObjectType.DepthPoints
+        //||| ViewObjectType.Bounds
+        ||| ViewObjectType.SolidVoxels
+        ||| ViewObjectType.SolidMesh
+        ||| ViewObjectType.InsidePoints
+        ||| ViewObjectType.OutsidePoints
+        ||| ViewObjectType.FreespacePoints
 
     member this.HandleCapture () =
         let captureVC = new CaptureViewController (project)
@@ -225,6 +246,25 @@ type ProjectViewController (project : Project) =
             viewPointsButton.Selected <- false
         viewPointsButton.Enabled <- project.NumCaptures > 0
 
+        if visibleTypes.HasFlag (ViewObjectType.InsidePoints) then
+            insidePointsNode.Hidden <- false
+            viewInsidePointsButton.Selected <- true
+        else
+            insidePointsNode.Hidden <- true
+            viewInsidePointsButton.Selected <- false
+        if visibleTypes.HasFlag (ViewObjectType.OutsidePoints) then
+            outsidePointsNode.Hidden <- false
+            viewOutsidePointsButton.Selected <- true
+        else
+            outsidePointsNode.Hidden <- true
+            viewOutsidePointsButton.Selected <- false
+        if visibleTypes.HasFlag (ViewObjectType.FreespacePoints) then
+            freespacePointsNode.Hidden <- false
+            viewFreespacePointsButton.Selected <- true
+        else
+            freespacePointsNode.Hidden <- true
+            viewFreespacePointsButton.Selected <- false
+
         if visibleTypes.HasFlag (ViewObjectType.SolidVoxels) then
             viewVoxelsButton.Selected <- true
             match solidVoxelsNode with
@@ -260,6 +300,7 @@ type ProjectViewController (project : Project) =
             trainingService.BatchTrained.Subscribe (fun (batchSize, totalTrained, loss) ->
                 this.BeginInvokeOnMainThread (fun _ ->
                     lossView.AddLoss (batchSize, totalTrained, loss)))
+            trainingService.NewBatchData.Subscribe this.HandleBatchData
 
             learningRateSlider.ValueChanged.Subscribe (fun lr ->
                 project.Settings.LearningRate <- lr
@@ -295,6 +336,9 @@ type ProjectViewController (project : Project) =
                         this.UpdateUI ())))
 
             viewPointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.DepthPoints))
+            viewInsidePointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.InsidePoints))
+            viewOutsidePointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.OutsidePoints))
+            viewFreespacePointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.FreespacePoints))
             viewVoxelsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.SolidVoxels))
             viewSolidMeshButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.SolidMesh))
             viewBoundsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.Bounds))
@@ -440,3 +484,13 @@ type ProjectViewController (project : Project) =
             SCNNode.FromGeometry(geometry)
         else
             SCNNode.Create ()
+
+    member this.HandleBatchData (batchData : BatchTrainingData) =
+        let inNode = SceneKitGeometry.createPointCloudNode  UIColor.SystemRed (batchData.InsideSurfacePoints.ToArray()) 
+        let outNode = SceneKitGeometry.createPointCloudNode UIColor.SystemGreen (batchData.OutsideSurfacePoints.ToArray()) 
+        let freeNode = SceneKitGeometry.createPointCloudNode UIColor.SystemBlue (batchData.FreespacePoints.ToArray()) 
+        SCNTransaction.Begin ()
+        insidePointsNode.AddChildNode inNode
+        outsidePointsNode.AddChildNode outNode
+        freespacePointsNode.AddChildNode freeNode
+        SCNTransaction.Commit ()

@@ -18,7 +18,39 @@ module MathOps =
         let u2 = StaticRandom.NextDouble ()
         float32 (Math.Sqrt(-2.0 * Math.Log (u1)) * Math.Cos(2.0 * Math.PI * u2))
 
+module SceneKitGeometry =
 
+    let createPointCloudGeometry (color : UIColor) (pointCoords : SCNVector3[]) =
+        if pointCoords.Length = 0 then
+            failwithf "No points provided"
+        let source = SCNGeometrySource.FromVertices(pointCoords)
+        let element =
+            let elemStream = new IO.MemoryStream ()
+            let elemWriter = new IO.BinaryWriter (elemStream)
+            for i in 0..(pointCoords.Length - 1) do
+                elemWriter.Write (i)
+            elemWriter.Flush ()
+            elemStream.Position <- 0L
+            let data = NSData.FromStream (elemStream)
+            SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Point, nint pointCoords.Length, nint 4)
+        let geometry = SCNGeometry.Create([|source|], [|element|])
+        element.PointSize <- nfloat 0.01f
+        element.MinimumPointScreenSpaceRadius <- nfloat 0.1f
+        element.MaximumPointScreenSpaceRadius <- nfloat 5.0f
+        let material = SCNMaterial.Create ()
+        material.Emission.ContentColor <- color
+        material.ReadsFromDepthBuffer <- true
+        material.WritesToDepthBuffer <- true
+        geometry.FirstMaterial <- material
+        geometry
+
+    let createPointCloudNode (color : UIColor) (pointCoords : SCNVector3[]) =
+        if pointCoords.Length = 0 then
+            SCNNode.Create ()
+        else
+            let g = createPointCloudGeometry color pointCoords
+            let n = SCNNode.FromGeometry g
+            n
 
 type SdfFrame (depthPath : string) =
 
@@ -143,25 +175,7 @@ type SdfFrame (depthPath : string) =
     let pointGeometry =
         lazy
             let pointCoords = pointCoords.Value
-            let source = SCNGeometrySource.FromVertices(pointCoords)
-            let element =
-                let elemStream = new IO.MemoryStream ()
-                let elemWriter = new IO.BinaryWriter (elemStream)
-                for i in 0..(pointCoords.Length - 1) do
-                    elemWriter.Write (i)
-                elemWriter.Flush ()
-                elemStream.Position <- 0L
-                let data = NSData.FromStream (elemStream)
-                SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Point, nint pointCoords.Length, nint 4)
-            let geometry = SCNGeometry.Create([|source|], [|element|])
-            element.PointSize <- nfloat 0.01f
-            element.MinimumPointScreenSpaceRadius <- nfloat 0.1f
-            element.MaximumPointScreenSpaceRadius <- nfloat 5.0f
-            let material = SCNMaterial.Create ()
-            material.ReadsFromDepthBuffer <- true
-            material.WritesToDepthBuffer <- true
-            geometry.FirstMaterial <- material
-            geometry
+            SceneKitGeometry.createPointCloudGeometry UIColor.White pointCoords
 
     let centerPoint =
         lazy
@@ -200,6 +214,16 @@ type SdfFrame (depthPath : string) =
                         n <- n + 1
             minv, maxv
 
+    let getRandomFreespaceDepthOffset (depth : float32) (x : int) (y : int) (poi : Vector3) : float32 =        
+        let mutable sampleDepth = depth * float32 (StaticRandom.NextDouble())
+        let mutable samplePos = clipPosition x y (sampleDepth - depth)
+        let mutable n = 0
+        while n < 5 && ((abs samplePos.X) > 1.0f || (abs samplePos.Y) > 1.0f || abs samplePos.Z > 1.0f) do
+            sampleDepth <- (sampleDepth + depth) * 0.5f
+            samplePos <- clipPosition x y (sampleDepth - depth)
+            n <- n + 1
+        sampleDepth - depth
+
     member this.DepthPath = depthPath
 
     member this.CenterPoint = centerPoint.Value
@@ -233,7 +257,7 @@ type SdfFrame (depthPath : string) =
 
     member this.PointCount = inboundIndices.Length
 
-    member this.GetRow (inside: bool, poi : Vector3, samplingDistance : float32, outputScale : float32) : struct (Tensor[]*Tensor[]) =
+    member this.GetRow (inside: bool, poi : Vector3, samplingDistance : float32, outputScale : float32, batchData : BatchTrainingData) : struct (Tensor[]*Tensor[]) =
         // i = y * width + x
         let index = inboundIndices.[StaticRandom.Next(inboundIndices.Length)]
         let x = index % width
@@ -242,18 +266,29 @@ type SdfFrame (depthPath : string) =
         // Half the time inside, half outside
         let depthOffset, free =
             if inside then
+                // Inside Surface
                 abs (randn () * samplingDistance), 0.0f
             else
                 // Outside
                 if StaticRandom.Next(2) = 0 then
-                    // Surface
+                    // Ouside Surface
                     -abs (randn () * samplingDistance), 0.0f
                 else
                     // Freespace
                     let depth = depths.[index]
-                    float32 (-StaticRandom.NextDouble()) * depth, 1.0f
+                    getRandomFreespaceDepthOffset depth x y poi, 1.0f
 
-        let pos = worldPosition x y depthOffset - Vector4(poi, 1.0f)
+        let wpos = worldPosition x y depthOffset
+
+        let swpos = SCNVector3 (wpos.X, wpos.Y, wpos.Z)
+        if depthOffset >= 0.0f then
+            batchData.InsideSurfacePoints.Add swpos
+        elif free > 0.5f then
+            batchData.FreespacePoints.Add swpos
+        else
+            batchData.OutsideSurfacePoints.Add swpos
+
+        let pos = wpos - Vector4(poi, 1.0f)
         let outputSignedDistance = -depthOffset * outputScale
         let inputs = [| Tensor.Array (vector4Shape, pos.X, pos.Y, pos.Z, 1.0f)
                         Tensor.Constant (free, freespaceShape)
@@ -269,5 +304,12 @@ type SdfFrame (depthPath : string) =
         let node = SCNNode.FromGeometry g
         node
 
+
+and BatchTrainingData =
+    {
+        InsideSurfacePoints : ResizeArray<SCNVector3>
+        OutsideSurfacePoints : ResizeArray<SCNVector3>
+        FreespacePoints : ResizeArray<SCNVector3>
+    }
 
 
