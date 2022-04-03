@@ -66,6 +66,9 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         }
     let mutable batchData = createBatchData ()
 
+    member this.IsClipPointOccupied (clipPoint : Vector4) : bool =
+        occupancy.IsOccupied (clipPoint.X, clipPoint.Y, clipPoint.Z)
+
     member this.ClipWorldPoint (worldPoint : Vector3) =
         Vector4.Transform (worldPoint, inverseClipTransform)
 
@@ -209,6 +212,9 @@ type TrainingService (project : Project) =
 
     let losses = ResizeArray<float32> ()
 
+    let outsideDistance = lossClipDelta
+    let outsideSdf = Vector4 (1.0f, 1.0f, 1.0f, outsideDistance)
+
     member this.Losses = losses.ToArray ()
 
     member this.BatchTrained = batchTrained.Publish
@@ -267,26 +273,33 @@ type TrainingService (project : Project) =
 
         let sdf (x : Memory<Vector3>) (y : Memory<Vector4>) =
             let n = x.Length
-            let batchTensors = tapool.Rent n
+            let batchTensors = ResizeArray<_> (n)
+            let batchOutputs = ResizeArray<_> (n)
             let x = x.Span
+            let yspan = y.Span
             for i in 0..(n - 1) do
                 //let p = x.[i] - data.VolumeCenter
                 let p = data.ClipWorldPoint x.[i]
-                let input = Tensor.Array(p.X, p.Y, p.Z, 1.0f)
-                let inputs = tpool.Rent 1
-                inputs.[0] <- input
-                batchTensors.[i] <- inputs
-            let results = model.Predict(batchTensors, n)
-            for i in 0..(n - 1) do
-                tpool.Return batchTensors.[i]
-            tapool.Return batchTensors
-            let y = y.Span
-            for i in 0..(x.Length-1) do
-                let r = results.[i].[0]
-                let yvec = Vector4(1.0f, 1.0f, 1.0f, r.[0])
-                //if numPoints < totalPoints / 100 then
-                //    printfn "%g" yvec.W
-                y.[i] <- yvec
+                if data.IsClipPointOccupied p then
+                    let input = Tensor.Array(p.X, p.Y, p.Z, 1.0f)
+                    let inputs = tpool.Rent 1
+                    inputs.[0] <- input
+                    batchTensors.Add inputs
+                    batchOutputs.Add i
+                else
+                    yspan.[i] <- outsideSdf
+            let nin = batchTensors.Count
+            if nin > 0 then
+                let results = model.Predict(batchTensors.ToArray (), nin)
+                for i in 0..(nin - 1) do
+                    tpool.Return batchTensors.[i]
+                //tapool.Return batchTensors
+                for i in 0..(nin-1) do
+                    let r = results.[i].[0]
+                    let yvec = Vector4(1.0f, 1.0f, 1.0f, r.[0])
+                    //if numPoints < totalPoints / 100 then
+                    //    printfn "%g" yvec.W
+                    yspan.[batchOutputs.[i]] <- yvec
             numPoints <- numPoints + y.Length
             let p = float32 numPoints / float32 totalPoints
             progress p

@@ -364,7 +364,16 @@ and AxisOccupancy =
             this.XAxis.[yi, zi] <- true
             this.YAxis.[zi, xi] <- true
             this.ZAxis.[xi, yi] <- true
-        ()
+    member this.IsOccupied (clipX : float32, clipY : float32, clipZ : float32) =
+        let n = this.NumCells
+        let s = float32 n / 2.0f
+        let xi = int ((clipX + 1.0f) * s)
+        let yi = int ((clipY + 1.0f) * s)
+        let zi = int ((clipZ + 1.0f) * s)
+        if 0 <= xi && xi < n && 0 <= yi && yi < n && 0 <= zi && zi < n then
+            this.XAxis.[yi, zi] && this.YAxis.[zi, xi] && this.ZAxis.[xi, yi]
+        else
+            false
     member this.GetUnoccupied () : OpenTK.Vector3i[] =
         let n = this.NumCells
         //let occ = ResizeArray<OpenTK.Vector3i> (n*n*n)
