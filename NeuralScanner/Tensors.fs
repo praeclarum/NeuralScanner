@@ -218,7 +218,7 @@ type SdfFrame (depthPath : string) =
         let mutable sampleDepth = depth * float32 (StaticRandom.NextDouble())
         let mutable samplePos = clipPosition x y (sampleDepth - depth)
         let mutable n = 0
-        while n < 5 && ((abs samplePos.X) > 1.0f || (abs samplePos.Y) > 1.0f || abs samplePos.Z > 1.0f) do
+        while n < 5 && ((abs samplePos.X) > 1.1f || (abs samplePos.Y) > 1.1f || abs samplePos.Z > 1.1f) do
             sampleDepth <- (sampleDepth + depth) * 0.5f
             samplePos <- clipPosition x y (sampleDepth - depth)
             n <- n + 1
