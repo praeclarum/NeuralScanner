@@ -23,6 +23,9 @@ type ViewObjectType =
 type ProjectViewController (project : Project) =
     inherit BaseViewController ()
 
+    // State
+    let mutable viewingMeshPath : string option = None
+
     // Services
     let trainingService = TrainingServices.getForProject (project)
 
@@ -48,6 +51,10 @@ type ProjectViewController (project : Project) =
                                                    16.0f, 256.0f,
                                                    (fun x -> MathF.Round x),
                                                    (fun x -> x))
+    let exportMeshButton = UIButton.FromType(UIButtonType.RoundedRect)
+    do
+        exportMeshButton.TranslatesAutoresizingMaskIntoConstraints <- false
+        exportMeshButton.SetImage(UIImage.GetSystemImage "square.and.arrow.up", UIControlState.Normal)
     let previewButton = UIButton.FromType(UIButtonType.RoundedRect)
     do
         previewButton.TranslatesAutoresizingMaskIntoConstraints <- false
@@ -142,7 +149,7 @@ type ProjectViewController (project : Project) =
     let mutable visibleTypes : ViewObjectType =
         ViewObjectType.DepthPoints
         //||| ViewObjectType.Bounds
-        ||| ViewObjectType.SolidVoxels
+        //||| ViewObjectType.SolidVoxels
         ||| ViewObjectType.SolidMesh
         ||| ViewObjectType.InsidePoints
         ||| ViewObjectType.OutsidePoints
@@ -189,6 +196,7 @@ type ProjectViewController (project : Project) =
         view.AddSubview previewResolutionSlider
         view.AddSubview viewButtons
         view.AddSubview scansButton
+        view.AddSubview exportMeshButton
 
         [|
             nameField.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
@@ -221,6 +229,8 @@ type ProjectViewController (project : Project) =
 
             scansButton.LayoutRight == viewButtons.LayoutLeft - 11
             scansButton.LayoutBaseline == viewPointsButton.LayoutBaseline
+            exportMeshButton.LayoutCenterX == scansButton.LayoutCenterX
+            exportMeshButton.LayoutBaseline == viewSolidMeshButton.LayoutBaseline
         |]
 
     override this.UpdateUI () =
@@ -286,6 +296,7 @@ type ProjectViewController (project : Project) =
             match solidVoxelsNode with
             | None -> viewVoxelsButton.Enabled <- false
             | Some x -> x.Hidden <- true; viewVoxelsButton.Enabled <- true
+
         if visibleTypes.HasFlag (ViewObjectType.SolidMesh) then
             viewSolidMeshButton.Selected <- true
             match solidMeshNode with
@@ -296,6 +307,7 @@ type ProjectViewController (project : Project) =
             match solidMeshNode with
             | None -> viewSolidMeshButton.Enabled <- false
             | Some x -> x.Hidden <- true; viewSolidMeshButton.Enabled <- true
+        exportMeshButton.Enabled <- viewingMeshPath.IsSome
 
         Threading.ThreadPool.QueueUserWorkItem (fun _ -> this.UpdatePointCloud ()) |> ignore
 
@@ -347,7 +359,7 @@ type ProjectViewController (project : Project) =
                         this.UpdateUI ())))
 
             scansButton.TouchUpInside.Subscribe (fun _ -> this.ShowFrames ())
-
+            exportMeshButton.TouchUpInside.Subscribe (fun _ -> this.ExportSolidMesh ())
             viewPointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.DepthPoints))
             viewInsidePointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.InsidePoints))
             viewOutsidePointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.OutsidePoints))
@@ -400,10 +412,19 @@ type ProjectViewController (project : Project) =
         Threading.ThreadPool.QueueUserWorkItem (fun _ ->
             setProgress 0.0f
             try
+                let mid = sprintf "%s_%d" trainingService.SnapshotId (int project.Settings.Resolution)
                 let voxels = trainingService.GenerateVoxels (setProgress)
+                let mesh = trainingService.GenerateMesh voxels
+                let meshPathTask = Threading.Tasks.Task.Run(fun () -> project.SaveSolidMesh (mesh, mid)).ContinueWith(fun (t : Threading.Tasks.Task<string>) ->
+                    if t.Exception <> null then
+                        this.ShowError t.Exception
+                    elif t.IsCompletedSuccessfully then
+                        this.BeginInvokeOnMainThread (fun () ->
+                            viewingMeshPath <- Some t.Result
+                            this.UpdateUI ()))
+
                 let vnode = this.CreateSolidVoxelsNode voxels
                 vnode.Hidden <- not (visibleTypes.HasFlag (ViewObjectType.SolidVoxels))
-                let mesh = trainingService.GenerateMesh voxels
                 let node = this.CreateSolidMeshNode mesh
                 node.Hidden <- not (visibleTypes.HasFlag (ViewObjectType.SolidMesh))
                 SCNTransaction.Begin ()
@@ -535,6 +556,19 @@ type ProjectViewController (project : Project) =
 
     member this.ShowFrames () =
         let vc = new FramesViewController (project)
-        this.PresentPopover (vc, scansButton)
+        let nc = new UINavigationController (vc)
+        this.PresentPopover (nc, scansButton)
         ()
+
+    member this.ExportSolidMesh () =
+        match viewingMeshPath with
+        | None -> ()
+        | Some path ->
+            let url = NSUrl.FromFilename path
+            let activityItems : NSObject[] = [| url |]
+            let vc = new UIActivityViewController (activityItems, null)
+            vc.CompletionHandler <- fun activityType completed ->
+                vc.DismissViewController (true, null)
+                ()
+            this.PresentPopover (vc, exportMeshButton)
 

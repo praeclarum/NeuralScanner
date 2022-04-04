@@ -38,6 +38,15 @@ type Project (settings : ProjectSettings, projectDir : string) =
     member this.NumCaptures = captureFiles.Length
     member this.NewFrameIndex = this.NumCaptures
 
+    member this.SaveSolidMesh (mesh : SdfKit.Mesh, meshId : string) : string =
+        let path = Path.Combine (projectDir, sprintf "%s_SolidMesh_%s.obj" this.Name meshId)
+        let tpath = Path.GetTempFileName ()
+        mesh.WriteObj (tpath)
+        if File.Exists path then
+            File.Delete path
+        File.Move (tpath, path)
+        path
+
     member this.ClipTransform =
         let st = SCNMatrix4.Scale (this.Settings.ClipScale.X, this.Settings.ClipScale.Y, this.Settings.ClipScale.Z)
         let tt = SCNMatrix4.CreateTranslation (this.Settings.ClipTranslation.X, this.Settings.ClipTranslation.Y, this.Settings.ClipTranslation.Z)

@@ -147,29 +147,21 @@ module VCUtils =
             alert.Show ())
 
     let presentPopoverFromButtonItem (presentVC : UIViewController) (button : UIBarButtonItem) (vc : UIViewController) =
-        let nc =
-            match presentVC with
-            | :? UINavigationController as n -> n
-            | _ -> new UINavigationController (presentVC)
-        nc.ModalPresentationStyle <- UIModalPresentationStyle.Popover
-        match nc.PopoverPresentationController with
+        presentVC.ModalPresentationStyle <- UIModalPresentationStyle.Popover
+        match presentVC.PopoverPresentationController with
         | null -> ()
         | p ->
             p.BarButtonItem <- button
-        vc.PresentViewController (nc, true, null)
+        vc.PresentViewController (presentVC, true, null)
 
     let presentPopoverFromView (presentVC : UIViewController) (button : UIView) (vc : UIViewController) =
-        let nc =
-            match presentVC with
-            | :? UINavigationController as n -> n
-            | _ -> new UINavigationController (presentVC)
-        nc.ModalPresentationStyle <- UIModalPresentationStyle.Popover
-        match nc.PopoverPresentationController with
+        presentVC.ModalPresentationStyle <- UIModalPresentationStyle.Popover
+        match presentVC.PopoverPresentationController with
         | null -> ()
         | p ->
             p.SourceView <- button
             p.SourceRect <- button.Bounds
-        vc.PresentViewController (nc, true, null)
+        vc.PresentViewController (presentVC, true, null)
 
 type BaseViewController () =
     inherit UIViewController ()

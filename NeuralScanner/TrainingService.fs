@@ -212,10 +212,22 @@ type TrainingService (project : Project) =
     let outsideDistance = lossClipDelta
     let outsideSdf = Vector4 (1.0f, 1.0f, 1.0f, outsideDistance)
 
+    let newTrainingId () =
+        DateTime.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture)
+    let mutable trainingId = newTrainingId ()
+
     member this.Losses = losses.ToArray ()
 
     member this.BatchTrained = batchTrained.Publish
     member this.NewBatchData = newBatchData.Publish
+
+    member this.Changed = changed.Publish
+
+    member this.IsTraining = training.IsSome
+
+    member this.TrainingId = trainingId
+
+    member this.SnapshotId = sprintf "%s_%d" this.TrainingId trainedPoints
 
     member private this.Train (cancel : Threading.CancellationToken) =
         //let data = SdfDataSet ("/Users/fak/Data/NeuralScanner/Onewheel")
@@ -319,10 +331,6 @@ type TrainingService (project : Project) =
         //mesh.WriteObj (dataDir + sprintf "/Onewheel_s%d_d%d_c%d_%s_l%d_%d.obj" (int outputScale) (int (1.0f/samplingDistance)) (int (1.0f/lossClipDelta)) (if useTanh then "tanh" else "n") (int (1.0f/learningRate)) trainedPoints)
         mesh
 
-    member this.Changed = changed.Publish
-
-    member this.IsTraining = training.IsSome
-
     member this.Run () =
         match training with
         | Some _ -> ()
@@ -349,9 +357,10 @@ type TrainingService (project : Project) =
                 File.Delete trainingModelPath
             trainingModelO <- None
             data <- lazy SdfDataSet (project, samplingDistance, outputScale)
+            trainingId <- newTrainingId ()
+            trainedPoints <- 0
         with ex ->
             reportError ex
-
 
 module TrainingServices =
     let private services = ConcurrentDictionary<string, TrainingService> ()
