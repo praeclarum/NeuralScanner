@@ -11,46 +11,65 @@ open MetalTensors
 open SceneKit
 open UIKit
 
-[<AutoOpen>]
-module MathOps =
-    let randn () =
-        let u1 = StaticRandom.NextDouble ()
-        let u2 = StaticRandom.NextDouble ()
-        float32 (Math.Sqrt(-2.0 * Math.Log (u1)) * Math.Cos(2.0 * Math.PI * u2))
+type BatchTrainingData =
+    {
+        InsideSurfacePoints : ResizeArray<SCNVector3>
+        OutsideSurfacePoints : ResizeArray<SCNVector3>
+        FreespacePoints : ResizeArray<SCNVector3>
+    }
 
-module SceneKitGeometry =
-
-    let createPointCloudGeometry (color : UIColor) (pointCoords : SCNVector3[]) =
-        if pointCoords.Length = 0 then
-            failwithf "No points provided"
-        let source = SCNGeometrySource.FromVertices(pointCoords)
-        let element =
-            let elemStream = new IO.MemoryStream ()
-            let elemWriter = new IO.BinaryWriter (elemStream)
-            for i in 0..(pointCoords.Length - 1) do
-                elemWriter.Write (i)
-            elemWriter.Flush ()
-            elemStream.Position <- 0L
-            let data = NSData.FromStream (elemStream)
-            SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Point, nint pointCoords.Length, nint 4)
-        let geometry = SCNGeometry.Create([|source|], [|element|])
-        element.PointSize <- nfloat 0.01f
-        element.MinimumPointScreenSpaceRadius <- nfloat 0.1f
-        element.MaximumPointScreenSpaceRadius <- nfloat 5.0f
-        let material = SCNMaterial.Create ()
-        material.Emission.ContentColor <- color
-        material.ReadsFromDepthBuffer <- true
-        material.WritesToDepthBuffer <- true
-        geometry.FirstMaterial <- material
-        geometry
-
-    let createPointCloudNode (color : UIColor) (pointCoords : SCNVector3[]) =
-        if pointCoords.Length = 0 then
-            SCNNode.Create ()
+type AxisOccupancy =
+    {
+        XAxis : bool[,]
+        YAxis : bool[,]
+        ZAxis : bool[,]
+    }
+    static member Create (n : int) =
+        {
+            XAxis = Array2D.zeroCreate n n
+            YAxis = Array2D.zeroCreate n n
+            ZAxis = Array2D.zeroCreate n n
+        }
+    member this.NumCells = this.ZAxis.GetLength (0)
+    member this.AddPoint (clipX : float32, clipY : float32, clipZ : float32) =
+        let n = this.NumCells
+        let s = float32 n / 2.0f
+        let xi = int ((clipX + 1.0f) * s)
+        let yi = int ((clipY + 1.0f) * s)
+        let zi = int ((clipZ + 1.0f) * s)
+        if 0 <= xi && xi < n && 0 <= yi && yi < n && 0 <= zi && zi < n then
+            this.XAxis.[yi, zi] <- true
+            this.YAxis.[zi, xi] <- true
+            this.ZAxis.[xi, yi] <- true
+    member this.IsOccupied (clipX : float32, clipY : float32, clipZ : float32) =
+        let n = this.NumCells
+        let s = float32 n / 2.0f
+        let xi = int ((clipX + 1.0f) * s)
+        let yi = int ((clipY + 1.0f) * s)
+        let zi = int ((clipZ + 1.0f) * s)
+        if 0 <= xi && xi < n && 0 <= yi && yi < n && 0 <= zi && zi < n then
+            this.XAxis.[yi, zi] && this.YAxis.[zi, xi] && this.ZAxis.[xi, yi]
         else
-            let g = createPointCloudGeometry color pointCoords
-            let n = SCNNode.FromGeometry g
-            n
+            false
+    member this.GetUnoccupied () : OpenTK.Vector3i[] =
+        let n = this.NumCells
+        //let occ = ResizeArray<OpenTK.Vector3i> (n*n*n)
+        let unocc = ResizeArray<OpenTK.Vector3i> (n*n*n)
+        for xi in 0..(n - 1) do
+            for yi in 0..(n - 1) do
+                if this.ZAxis.[xi, yi] then
+                    for zi in 0..(n - 1) do
+                        if this.XAxis.[yi, zi] && this.YAxis.[zi, xi] then
+                            //occ.Add (OpenTK.Vector3i (xi, yi, zi))
+                            ()
+                        else
+                            unocc.Add (OpenTK.Vector3i (xi, yi, zi))
+                else
+                    for zi in 0..(n - 1) do
+                        unocc.Add (OpenTK.Vector3i (xi, yi, zi))
+        unocc.ToArray ()
+
+
 
 type FrameConfig (visible : bool) =
     inherit Configurable ()
@@ -157,28 +176,30 @@ type SdfFrame (depthPath : string) =
 
     let index x y = y * width + x
 
-    let cameraPosition (x : int) (y : int) depthOffset : Vector4 =
+    let cameraPosition (x : int) (y : int) depthOffset : Vector3 =
         let depth = -(depths.[index x y] + depthOffset)
         let xc = -(float32 x - intrinsics.M13) * depth / intrinsics.M11
         let yc = (float32 y - intrinsics.M23) * depth / intrinsics.M22
-        Vector4(xc, yc, depth, 1.0f)
+        Vector3(xc, yc, depth)
 
-    let worldPosition (x : int) (y : int) depthOffset : Vector4 =
+    let worldPosition (x : int) (y : int) depthOffset : Vector3 =
         let camPos = cameraPosition x y depthOffset
         // World = Transform * Camera
         // World = Camera * Transform'
         //let testResult = Vector4.Transform(Vector4.UnitW, transform)
-        Vector4.Transform(camPos, transform)
+        let v4 = Vector4.Transform(camPos, transform)
+        Vector3 (v4.X, v4.Y, v4.Z)
 
     let mutable camToClipTransform = transform
     let mutable clipToWorldTransform = transform
 
-    let clipPosition (x : int) (y : int) depthOffset : Vector4 =
+    let clipPosition (x : int) (y : int) depthOffset : Vector3 =
         let camPos = cameraPosition x y depthOffset
         // World = Transform * Camera
         // World = Camera * Transform'
         //let testResult = Vector4.Transform(Vector4.UnitW, transform)
-        Vector4.Transform(camPos, camToClipTransform)
+        let v4 = Vector4.Transform(camPos, camToClipTransform)
+        Vector3 (v4.X, v4.Y, v4.Z)
 
     let centerPos = worldPosition (width/2) (height/2) 0.0f
 
@@ -260,13 +281,13 @@ type SdfFrame (depthPath : string) =
         let m = float32 i * 2.0f / float32 numOccCells - 1.0f
         m + d * (float32 (StaticRandom.NextDouble ()))
 
-    let getRandomUnoccupiedClipPoint (unoccupied : OpenTK.Vector3i[]) (numOccCells : int) : Vector4 =
+    let getRandomUnoccupiedClipPoint (unoccupied : OpenTK.Vector3i[]) (numOccCells : int) : Vector3 =
         let ui = StaticRandom.Next (unoccupied.Length)
         let clipIndex = unoccupied.[ui]
         let clipX = getRandomCellPoint clipIndex.X numOccCells
         let clipY = getRandomCellPoint clipIndex.Y numOccCells
         let clipZ = getRandomCellPoint clipIndex.Z numOccCells
-        Vector4 (clipX, clipY, clipZ, 1.0f)
+        Vector3 (clipX, clipY, clipZ)
 
     member this.Title = title
     override this.ToString () = this.Title
@@ -373,61 +394,19 @@ type SdfFrame (depthPath : string) =
         let node = SCNNode.FromGeometry g
         node
 
-
-and BatchTrainingData =
-    {
-        InsideSurfacePoints : ResizeArray<SCNVector3>
-        OutsideSurfacePoints : ResizeArray<SCNVector3>
-        FreespacePoints : ResizeArray<SCNVector3>
-    }
-
-and AxisOccupancy =
-    {
-        XAxis : bool[,]
-        YAxis : bool[,]
-        ZAxis : bool[,]
-    }
-    static member Create (n : int) =
-        {
-            XAxis = Array2D.zeroCreate n n
-            YAxis = Array2D.zeroCreate n n
-            ZAxis = Array2D.zeroCreate n n
-        }
-    member this.NumCells = this.ZAxis.GetLength (0)
-    member this.AddPoint (clipX : float32, clipY : float32, clipZ : float32) =
-        let n = this.NumCells
-        let s = float32 n / 2.0f
-        let xi = int ((clipX + 1.0f) * s)
-        let yi = int ((clipY + 1.0f) * s)
-        let zi = int ((clipZ + 1.0f) * s)
-        if 0 <= xi && xi < n && 0 <= yi && yi < n && 0 <= zi && zi < n then
-            this.XAxis.[yi, zi] <- true
-            this.YAxis.[zi, xi] <- true
-            this.ZAxis.[xi, yi] <- true
-    member this.IsOccupied (clipX : float32, clipY : float32, clipZ : float32) =
-        let n = this.NumCells
-        let s = float32 n / 2.0f
-        let xi = int ((clipX + 1.0f) * s)
-        let yi = int ((clipY + 1.0f) * s)
-        let zi = int ((clipZ + 1.0f) * s)
-        if 0 <= xi && xi < n && 0 <= yi && yi < n && 0 <= zi && zi < n then
-            this.XAxis.[yi, zi] && this.YAxis.[zi, xi] && this.ZAxis.[xi, yi]
-        else
-            false
-    member this.GetUnoccupied () : OpenTK.Vector3i[] =
-        let n = this.NumCells
-        //let occ = ResizeArray<OpenTK.Vector3i> (n*n*n)
-        let unocc = ResizeArray<OpenTK.Vector3i> (n*n*n)
-        for xi in 0..(n - 1) do
-            for yi in 0..(n - 1) do
-                if this.ZAxis.[xi, yi] then
-                    for zi in 0..(n - 1) do
-                        if this.XAxis.[yi, zi] && this.YAxis.[zi, xi] then
-                            //occ.Add (OpenTK.Vector3i (xi, yi, zi))
-                            ()
-                        else
-                            unocc.Add (OpenTK.Vector3i (xi, yi, zi))
-                else
-                    for zi in 0..(n - 1) do
-                        unocc.Add (OpenTK.Vector3i (xi, yi, zi))
-        unocc.ToArray ()
+    member this.AddWorldPointsToVoxels (voxels : SdfKit.Voxels) =
+        let nx = voxels.NX
+        let ny = voxels.NY
+        let nz = voxels.NZ
+        for x in 0..(width-1) do
+            for y in 0..(height-1) do
+                let i = index x y
+                if confidences.[i] >= minConfidence then
+                    let wpos = worldPosition x y 0.0f
+                    let vf = (wpos - voxels.Min) / voxels.Size
+                    let xi = int (vf.X * float32 nx)
+                    let yi = int (vf.Y * float32 ny)
+                    let zi = int (vf.Z * float32 nz)
+                    if 0 <= xi && xi < nx && 0 <= yi && yi < ny && 0 <= zi && zi < nz then
+                        voxels.[xi, yi, zi] <- voxels.[xi, yi, zi] + 1.0f
+        ()

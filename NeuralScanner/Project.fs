@@ -11,6 +11,21 @@ module ProjectDefaults =
     let resolution = 32.0f
     let clipScale = 0.5f
 
+    // Hyperparameters
+    let outputScale = 200.0f
+    let samplingDistance = 1.0e-3f
+    let lossClipDelta = 1.0e-2f * outputScale
+    let networkDepth = 8
+    let networkWidth = 512
+    let batchSize = 2*1024
+    let useTanh = false
+    let dropoutRate = 0.2f
+
+    // Derived
+    let outsideDistance = lossClipDelta
+    let outsideSdf = Vector4 (1.0f, 1.0f, 1.0f, outsideDistance)
+
+
 type Project (settings : ProjectSettings, projectDir : string) =
     
     let settingsPath = Path.Combine (projectDir, "Settings.xml")
@@ -94,8 +109,8 @@ type Project (settings : ProjectSettings, projectDir : string) =
         let config = this.Settings.Config
         Threading.ThreadPool.QueueUserWorkItem (fun _ ->
             lock saveMonitor (fun () ->
-                printfn "SAVE PROJECT: %s" settingsPath
                 config.Write (settingsPath)
+                printfn "SAVED PROJECT: %s" settingsPath
                 //let fileOutput = IO.File.ReadAllText(settingsPath)
                 //printfn "FILE:\n%s" fileOutput
                 //let newConfig = Config.Read<ProjectSettings> (settingsPath)
@@ -184,22 +199,3 @@ module ProjectManager =
         |> Array.map loadProject
         |> Array.sortBy (fun x -> x.Name)
 
-//type ProjectFramesManager (project : Project) =
-//    let mutable depthPaths : string list =
-//        []
-//    member this.NewFrameIndex = depthPaths.Length
-//    member this.AddFrame (depthPath : string) =
-//        depthPaths <- depthPath :: depthPaths
-
-//module ProjectFramesManagers =
-//    let private services = System.Collections.Concurrent.ConcurrentDictionary<string, ProjectFramesManager> ()
-//    let getForProject (project : Project) : ProjectFramesManager =
-//        let key = project.ProjectDirectory
-//        match services.TryGetValue key with
-//        | true, x -> x
-//        | _ ->
-//            let s = ProjectFramesManager (project)
-//            if services.TryAdd (key, s) then
-//                s
-//            else
-//                services.[key]

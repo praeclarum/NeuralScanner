@@ -19,6 +19,7 @@ type ViewObjectType =
     | InsidePoints = 16
     | OutsidePoints = 32
     | FreespacePoints = 64
+    | RoughMesh = 128
 
 type ProjectViewController (project : Project) =
     inherit BaseViewController ()
@@ -101,10 +102,12 @@ type ProjectViewController (project : Project) =
     let viewFreespacePointsButton = new ToggleButton ("Freespace")
     let viewVoxelsButton = new ToggleButton ("Voxels")
     let viewSolidMeshButton = new ToggleButton ("Solid Mesh")
+    let viewRoughMeshButton = new ToggleButton ("Rough Mesh")
     let viewButtons = new UIStackView (Axis = UILayoutConstraintAxis.Vertical, Spacing = nfloat 11.0, TranslatesAutoresizingMaskIntoConstraints = false)
     do
         viewButtons.AddArrangedSubview viewBoundsButton
         viewButtons.AddArrangedSubview viewPointsButton
+        viewButtons.AddArrangedSubview viewRoughMeshButton
         viewButtons.AddArrangedSubview viewInsidePointsButton
         viewButtons.AddArrangedSubview viewOutsidePointsButton
         viewButtons.AddArrangedSubview viewFreespacePointsButton
@@ -135,6 +138,7 @@ type ProjectViewController (project : Project) =
     do rootNode.AddNodes [| insidePointsNode; outsidePointsNode; freespacePointsNode |]
 
     let framePointNodes = ConcurrentDictionary<string, SCNNode> ()
+    let mutable roughMeshNode : SCNNode option = None
     let mutable solidMeshNode : SCNNode option = None
     let mutable solidVoxelsNode : SCNNode option = None
     let boundsNode =
@@ -150,6 +154,7 @@ type ProjectViewController (project : Project) =
         ViewObjectType.DepthPoints
         //||| ViewObjectType.Bounds
         //||| ViewObjectType.SolidVoxels
+        ||| ViewObjectType.RoughMesh
         ||| ViewObjectType.SolidMesh
         ||| ViewObjectType.InsidePoints
         ||| ViewObjectType.OutsidePoints
@@ -168,6 +173,12 @@ type ProjectViewController (project : Project) =
             [|
                 new UIBarButtonItem (UIImage.GetSystemImage "gearshape", UIBarButtonItemStyle.Plain, this, new ObjCRuntime.Selector ("showProjectSettings:"))
             |]
+        if project.NumCaptures > 0 then
+            Threading.ThreadPool.QueueUserWorkItem (fun _ ->
+                this.GenerateRoughMesh (fun () ->
+                    this.BeginInvokeOnMainThread (fun _ ->
+                        this.UpdateUI ())))
+            |> ignore
 
     member this.SettingsButton = this.NavigationItem.RightBarButtonItems.[0]
 
@@ -311,6 +322,17 @@ type ProjectViewController (project : Project) =
             | Some x -> x.Hidden <- true; viewSolidMeshButton.Enabled <- true
         exportMeshButton.Enabled <- viewingMeshPath.IsSome
 
+        if visibleTypes.HasFlag (ViewObjectType.RoughMesh) then
+            viewRoughMeshButton.Selected <- true
+            match roughMeshNode with
+            | None -> viewRoughMeshButton.Enabled <- false
+            | Some x -> x.Hidden <- false; viewRoughMeshButton.Enabled <- true
+        else
+            viewRoughMeshButton.Selected <- false
+            match roughMeshNode with
+            | None -> viewRoughMeshButton.Enabled <- false
+            | Some x -> x.Hidden <- true; viewRoughMeshButton.Enabled <- true
+
         Threading.ThreadPool.QueueUserWorkItem (fun _ -> this.UpdatePointCloud ()) |> ignore
 
     override this.SubscribeUI () =
@@ -355,7 +377,7 @@ type ProjectViewController (project : Project) =
                 let wasTraining = trainingService.IsTraining
                 trainingService.Pause ()
                 this.UpdateUI ()
-                this.GeneratePreviewMesh (fun () ->
+                this.GenerateSolidMesh (fun () ->
                     if wasTraining then
                         trainingService.Run ()
                     this.BeginInvokeOnMainThread (fun _ ->
@@ -369,6 +391,7 @@ type ProjectViewController (project : Project) =
             viewOutsidePointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.OutsidePoints))
             viewFreespacePointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.FreespacePoints))
             viewVoxelsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.SolidVoxels))
+            viewRoughMeshButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.RoughMesh))
             viewSolidMeshButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.SolidMesh))
             viewBoundsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.Bounds))
         |]
@@ -405,7 +428,38 @@ type ProjectViewController (project : Project) =
                 | _ -> ()
         SCNTransaction.Commit ()
 
-    member private this.GeneratePreviewMesh (k : unit -> unit) =
+    member private this.GenerateRoughMesh (k : unit -> unit) =
+        let setProgress p =
+            this.BeginInvokeOnMainThread (fun _ ->
+                if 1e-6f <= p && p < 0.995f then
+                    previewProgress.Progress <- p
+                    previewProgress.Alpha <- nfloat 1.0
+                else
+                    previewProgress.Alpha <- nfloat 0.0)
+        Threading.ThreadPool.QueueUserWorkItem (fun _ ->
+            setProgress 0.0f
+            try
+                let voxels = Meshes.generateRoughVoxels trainingService.Data setProgress
+                let mesh = Meshes.meshFromVoxels voxels
+                let node = SceneKitGeometry.createSolidMeshNode mesh
+                node.Hidden <- not (visibleTypes.HasFlag (ViewObjectType.RoughMesh))
+                node.Opacity <- nfloat 0.0
+                SCNTransaction.Begin ()
+                SCNTransaction.AnimationDuration <- 1.0
+                match solidMeshNode with
+                | None -> ()
+                | Some x -> x.RemoveFromParentNode ()
+                roughMeshNode <- Some node
+                rootNode.AddChildNode node
+                node.Opacity <- nfloat 1.0
+                SCNTransaction.Commit ()
+            with ex ->
+                this.ShowError ex
+            setProgress 1.1f
+            k ())
+        |> ignore
+
+    member private this.GenerateSolidMesh (k : unit -> unit) =
         let setProgress p =
             this.BeginInvokeOnMainThread (fun _ ->
                 if 1e-6f <= p && p < 0.995f then
@@ -417,8 +471,8 @@ type ProjectViewController (project : Project) =
             setProgress 0.0f
             try
                 let mid = sprintf "%s_%d" trainingService.SnapshotId (int project.Settings.Resolution)
-                let voxels = trainingService.GenerateVoxels (setProgress)
-                let mesh = trainingService.GenerateMesh voxels
+                let voxels = Meshes.generateSolidVoxels trainingService.Model trainingService.Data setProgress
+                let mesh = Meshes.meshFromVoxels voxels
                 if mesh.Triangles.Length > 0 then
                     let meshPathTask = Threading.Tasks.Task.Run(fun () -> project.SaveSolidMesh (mesh, mid)).ContinueWith(fun (t : Threading.Tasks.Task<string>) ->
                         if t.Exception <> null then
@@ -430,7 +484,7 @@ type ProjectViewController (project : Project) =
                     ()
                 let vnode = this.CreateSolidVoxelsNode voxels
                 vnode.Hidden <- not (visibleTypes.HasFlag (ViewObjectType.SolidVoxels))
-                let node = this.CreateSolidMeshNode mesh
+                let node = SceneKitGeometry.createSolidMeshNode mesh
                 node.Hidden <- not (visibleTypes.HasFlag (ViewObjectType.SolidMesh))
                 SCNTransaction.Begin ()
                 match solidVoxelsNode with
@@ -502,32 +556,7 @@ type ProjectViewController (project : Project) =
         else
             SCNNode.Create ()
 
-    member private this.CreateSolidMeshNode (mesh : SdfKit.Mesh) : SCNNode =
-        if mesh.Vertices.Length > 0 && mesh.Triangles.Length > 0 then
-            let vertsSource =
-                mesh.Vertices
-                |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))
-                |> SCNGeometrySource.FromVertices
-            let normsSource =
-                mesh.Normals
-                |> Array.map (fun v -> SCNVector3(-v.X, -v.Y, -v.Z))
-                |> SCNGeometrySource.FromNormals
-            let element =
-                let elemStream = new IO.MemoryStream ()
-                let elemWriter = new IO.BinaryWriter (elemStream)
-                for i in 0..(mesh.Triangles.Length - 1) do
-                    elemWriter.Write (mesh.Triangles.[i])
-                elemWriter.Flush ()
-                elemStream.Position <- 0L
-                let data = NSData.FromStream (elemStream)
-                SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Triangles, nint (mesh.Triangles.Length / 3), nint 4)
-            let geometry = SCNGeometry.Create([|vertsSource;normsSource|], [|element|])
-            let material = SCNMaterial.Create ()
-            material.Diffuse.ContentColor <- UIColor.White
-            geometry.FirstMaterial <- material
-            SCNNode.FromGeometry(geometry)
-        else
-            SCNNode.Create ()
+    
 
     member this.HandleBatchData (batchData : BatchTrainingData) =
         let inNode = SceneKitGeometry.createPointCloudNode  UIColor.SystemRed (batchData.InsideSurfacePoints.ToArray()) 

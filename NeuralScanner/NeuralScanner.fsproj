@@ -99,8 +99,11 @@
     <None Include="Info.plist" />
     <None Include="Entitlements.plist" />
     <InterfaceDefinition Include="Main.storyboard" />
-    <Compile Include="Tensors.fs" />
+    <Compile Include="SceneKitGeometry.fs" />
+    <Compile Include="SdfFrame.fs" />
     <Compile Include="Project.fs" />
+    <Compile Include="SdfDataSource.fs" />
+    <Compile Include="Meshes.fs" />
     <Compile Include="TrainingService.fs" />
     <Compile Include="AutoLayout.fs" />
     <Compile Include="UIControls.fs" />
