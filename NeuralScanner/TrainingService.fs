@@ -17,9 +17,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
 
     let depthFiles = project.DepthPaths
 
-    let frames =
-        depthFiles
-        |> Array.map (fun x -> project.GetFrame x)
+    let frames = project.GetVisibleFrames ()
     let count = depthFiles |> Seq.sumBy (fun x -> 1)
     do if count = 0 then failwithf "No files in %s" dataDirectory
     let framesMin =
@@ -77,7 +75,6 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
     member this.VolumeCenter = volumeCenter
 
     override this.Count = frames |> Array.sumBy (fun x -> x.PointCount)
-
 
     override this.GetRow (index, _) =
         let inside = (index % 2) = 0
@@ -172,7 +169,7 @@ type TrainingService (project : Project) =
         printfn "%s" model.Summary
         model
 
-    let data = lazy SdfDataSet (project, samplingDistance, outputScale)            
+    let mutable data = lazy SdfDataSet (project, samplingDistance, outputScale)
 
     //let modelPath = dataDir + "/Model.zip"
     let trainingModelPath = dataDir + "/TrainingModel.zip"
@@ -351,6 +348,7 @@ type TrainingService (project : Project) =
             if File.Exists trainingModelPath then
                 File.Delete trainingModelPath
             trainingModelO <- None
+            data <- lazy SdfDataSet (project, samplingDistance, outputScale)
         with ex ->
             reportError ex
 

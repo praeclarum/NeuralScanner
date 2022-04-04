@@ -49,10 +49,24 @@ type Project (settings : ProjectSettings, projectDir : string) =
     member this.SetModified (property : string) =
         this.Settings.ModifiedUtc <- DateTime.UtcNow
         this.Save ()
+        this.SetChanged property
+
+    member this.SetChanged (property : string) =
         changed.Trigger property
 
     member this.GetFrame (depthPath : string) : SdfFrame =
         frames.GetOrAdd (depthPath, fun x -> SdfFrame x)
+
+    member this.GetFrames () : SdfFrame[] =
+        this.DepthPaths
+        |> Array.map this.GetFrame
+        |> Array.sortBy (fun x -> x.FrameIndex)
+
+    member this.GetVisibleFrames () : SdfFrame[] =
+        this.DepthPaths
+        |> Array.map this.GetFrame
+        |> Array.filter (fun x -> x.Visible)
+        |> Array.sortBy (fun x -> x.FrameIndex)
 
     member this.AddFrame (frame : SdfFrame) =
         captureFiles <- Array.append captureFiles [| frame.DepthPath |]
@@ -104,6 +118,7 @@ module ProjectManager =
 
     let mutable private loadedProjects : Map<string, Project> = Map.empty
 
+    do Config.EnableReading<FrameConfig> ()
     do Config.EnableReading<ProjectSettings> ()
 
     let showError (e : exn) = printfn "ERROR: %O" e

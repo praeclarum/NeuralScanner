@@ -105,6 +105,7 @@
     <Compile Include="AutoLayout.fs" />
     <Compile Include="UIControls.fs" />
     <Compile Include="ProjectSettingsViewController.fs" />
+    <Compile Include="FramesViewController.fs" />
     <Compile Include="CaptureViewController.fs" />
     <Compile Include="LossGraphView.fs" />
     <Compile Include="ProjectViewController.fs" />

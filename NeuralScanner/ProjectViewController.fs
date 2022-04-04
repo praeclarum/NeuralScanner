@@ -81,6 +81,12 @@ type ProjectViewController (project : Project) =
 
     let previewProgress = new UIProgressView (Alpha = nfloat 0.0f, TranslatesAutoresizingMaskIntoConstraints = false)
 
+    let scansButton =
+        let b = UIButton.FromType (UIButtonType.RoundedRect)
+        b.TranslatesAutoresizingMaskIntoConstraints <- false
+        b.SetImage (UIImage.GetSystemImage ("eye.fill"), UIControlState.Normal)
+        b
+
     let viewBoundsButton = new ToggleButton ("Bounds")
     let viewPointsButton = new ToggleButton ("Points")
     let viewInsidePointsButton = new ToggleButton ("Inside")
@@ -182,6 +188,7 @@ type ProjectViewController (project : Project) =
         view.AddSubview previewButton
         view.AddSubview previewResolutionSlider
         view.AddSubview viewButtons
+        view.AddSubview scansButton
 
         [|
             nameField.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
@@ -211,6 +218,9 @@ type ProjectViewController (project : Project) =
             previewProgress.LayoutHeight == 4
             previewProgress.LayoutLeft == viewButtons.LayoutLeft
             previewProgress.LayoutRight == viewButtons.LayoutRight
+
+            scansButton.LayoutRight == viewButtons.LayoutLeft - 11
+            scansButton.LayoutBaseline == viewPointsButton.LayoutBaseline
         |]
 
     override this.UpdateUI () =
@@ -245,6 +255,7 @@ type ProjectViewController (project : Project) =
             pointCloudNode.Hidden <- true
             viewPointsButton.Selected <- false
         viewPointsButton.Enabled <- project.NumCaptures > 0
+        scansButton.Enabled <- project.NumCaptures > 0
 
         if visibleTypes.HasFlag (ViewObjectType.InsidePoints) then
             insidePointsNode.Hidden <- false
@@ -335,6 +346,8 @@ type ProjectViewController (project : Project) =
                         previewButton.Enabled <- true
                         this.UpdateUI ())))
 
+            scansButton.TouchUpInside.Subscribe (fun _ -> this.ShowFrames ())
+
             viewPointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.DepthPoints))
             viewInsidePointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.InsidePoints))
             viewOutsidePointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.OutsidePoints))
@@ -362,13 +375,18 @@ type ProjectViewController (project : Project) =
     member this.UpdatePointCloud () =
         SCNTransaction.Begin ()
         for fi in project.DepthPaths do
-            let node = framePointNodes.GetOrAdd (fi, fun fi ->
-                let f = project.GetFrame fi
-                let n = f.CreatePointNode (UIColor.SystemOrange)
-                n.Opacity <- nfloat 0.05
-                pointCloudNode.AddChildNode n
-                n)
-            ()
+            let f = project.GetFrame fi
+            if f.Visible then
+                let node = framePointNodes.GetOrAdd (fi, fun fi ->
+                    let n = f.CreatePointNode (UIColor.SystemOrange)
+                    n.Opacity <- nfloat 0.05
+                    pointCloudNode.AddChildNode n
+                    n)
+                node.Hidden <- false
+            else
+                match framePointNodes.TryGetValue fi with
+                | true, n -> n.Hidden <- true
+                | _ -> ()
         SCNTransaction.Commit ()
 
     member private this.GeneratePreviewMesh (k : unit -> unit) =
@@ -514,4 +532,9 @@ type ProjectViewController (project : Project) =
             SCNTransaction.Commit ()
             ())
         SCNTransaction.Commit ()
+
+    member this.ShowFrames () =
+        let vc = new FramesViewController (project)
+        this.PresentPopover (vc, scansButton)
+        ()
 

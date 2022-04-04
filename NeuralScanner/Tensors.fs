@@ -52,7 +52,37 @@ module SceneKitGeometry =
             let n = SCNNode.FromGeometry g
             n
 
+type FrameConfig (visible : bool) =
+    inherit Configurable ()
+    member val Visible = visible with get, set
+    override this.Config = base.Config.Add("visible", this.Visible)
+
 type SdfFrame (depthPath : string) =
+
+    let name = IO.Path.GetFileNameWithoutExtension(depthPath).Replace("_Depth", "")
+    let frameIndex = try Int32.Parse (name.Replace("Frame", "")) with _ -> 0
+    let title = sprintf "Scan %d" frameIndex
+
+    let filePath fileName = depthPath.Replace ("_Depth.pixelbuffer", "_" + fileName)
+
+    let imagePath = filePath "Image.jpg"
+
+    let configPath = filePath "Config.xml"
+    let newConfig () = FrameConfig (visible = true)
+    let config =
+        if File.Exists configPath then
+            try
+                Config.Read<FrameConfig> (configPath)
+            with ex ->
+                printfn "ERROR: %O" ex
+                newConfig ()
+        else newConfig ()
+    let saveConfig () =
+        try
+            config.Save (configPath)
+            printfn "SAVED FRAME CONFIG: %s" configPath
+        with ex ->
+            printfn "ERROR: %O" ex
 
     let width, height, depths =
         let f = File.OpenRead (depthPath)
@@ -107,12 +137,12 @@ type SdfFrame (depthPath : string) =
                   rows.[3].[0], rows.[3].[1], rows.[3].[2], rows.[3].[3])
 
     let resolution =
-        let text = File.ReadAllText (depthPath.Replace ("_Depth.pixelbuffer", "_Resolution.txt"))
+        let text = IO.File.ReadAllText (filePath "Resolution.txt")
         let parts = text.Trim().Split(' ')
         (Single.Parse (parts.[0], CultureInfo.InvariantCulture), Single.Parse (parts.[1], CultureInfo.InvariantCulture))
 
     let intrinsics =
-        let mutable m = loadMatrix (depthPath.Replace ("_Depth.pixelbuffer", "_Intrinsics.txt"))
+        let mutable m = loadMatrix (filePath "Intrinsics.txt")
         let colorWidth, _ = resolution
         let iscale = float32 width / float32 colorWidth
         m.M11 <- m.M11 * iscale
@@ -120,9 +150,9 @@ type SdfFrame (depthPath : string) =
         m.M13 <- m.M13 * iscale
         m.M23 <- m.M23 * iscale
         m
-    let projection = loadMatrix (depthPath.Replace ("_Depth.pixelbuffer", "_Projection.txt"))
+    let projection = loadMatrix (filePath "Projection.txt")
     let transform =
-        let m = loadMatrix (depthPath.Replace ("_Depth.pixelbuffer", "_Transform.txt"))
+        let m = loadMatrix (filePath "Transform.txt")
         Matrix4x4.Transpose(m)
 
     let index x y = y * width + x
@@ -238,11 +268,21 @@ type SdfFrame (depthPath : string) =
         let clipZ = getRandomCellPoint clipIndex.Z numOccCells
         Vector4 (clipX, clipY, clipZ, 1.0f)
 
+    member this.Title = title
+    override this.ToString () = this.Title
+
+    member this.ImagePath = imagePath
+
+    member this.FrameIndex = frameIndex
+
     member this.DepthPath = depthPath
 
     member this.CenterPoint = centerPoint.Value
     member this.MinPoint = fst minMaxPoints.Value
     member this.MaxPoint = snd minMaxPoints.Value
+
+    member this.Visible with get () = config.Visible
+                        and set v = config.Visible <- v; saveConfig ()
 
     member this.FindInBoundPoints (min : Vector3, max : Vector3) =
         let inbounds = ResizeArray<_>()

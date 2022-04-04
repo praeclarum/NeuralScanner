@@ -158,6 +158,19 @@ module VCUtils =
             p.BarButtonItem <- button
         vc.PresentViewController (nc, true, null)
 
+    let presentPopoverFromView (presentVC : UIViewController) (button : UIView) (vc : UIViewController) =
+        let nc =
+            match presentVC with
+            | :? UINavigationController as n -> n
+            | _ -> new UINavigationController (presentVC)
+        nc.ModalPresentationStyle <- UIModalPresentationStyle.Popover
+        match nc.PopoverPresentationController with
+        | null -> ()
+        | p ->
+            p.SourceView <- button
+            p.SourceRect <- button.Bounds
+        vc.PresentViewController (nc, true, null)
+
 type BaseViewController () =
     inherit UIViewController ()
 
@@ -190,7 +203,8 @@ type BaseViewController () =
         this.UpdateUI ()
 
     member this.ShowError (ex : exn) = VCUtils.showException ex this
-    member this.PresentPopover (vc, b) = VCUtils.presentPopoverFromButtonItem vc b this
+    member this.PresentPopover (vc, b : UIBarButtonItem) = VCUtils.presentPopoverFromButtonItem vc b this
+    member this.PresentPopover (vc, v : UIView) = VCUtils.presentPopoverFromView vc v this
         
 
 type BaseTableViewController (style : UITableViewStyle) =
@@ -219,7 +233,8 @@ type BaseTableViewController (style : UITableViewStyle) =
         this.UpdateUI ()
 
     member this.ShowError (ex : exn) = VCUtils.showException ex this
-    member this.PresentPopover (vc, b) = VCUtils.presentPopoverFromButtonItem vc b this
+    member this.PresentPopover (vc, b : UIBarButtonItem) = VCUtils.presentPopoverFromButtonItem vc b this
+    member this.PresentPopover (vc, v : UIView) = VCUtils.presentPopoverFromView vc v this
         
 
 type FormViewController () =
