@@ -215,8 +215,8 @@ type SdfFrame (depthPath : string) =
                         n <- n + 1
             minv, maxv
 
-    let getRandomFreespaceDepthOffset (depth : float32) (x : int) (y : int) (poi : Vector3) : float32 =        
-        let mutable sampleDepth = depth * float32 (StaticRandom.NextDouble())
+    let getRandomFreespaceDepthOffset (depth : float32) (x : int) (y : int) : float32 =        
+        let mutable sampleDepth = depth * (0.9f + 0.09f*float32 (StaticRandom.NextDouble()))
         let mutable samplePos = clipPosition x y (sampleDepth - depth)
         let mutable n = 0
         while n < 5 && ((abs samplePos.X) > 1.1f || (abs samplePos.Y) > 1.1f || abs samplePos.Z > 1.1f) do
@@ -302,7 +302,7 @@ type SdfFrame (depthPath : string) =
                         else
                             // Freespace
                             let depth = depths.[index]
-                            getRandomFreespaceDepthOffset depth x y poi, 1.0f
+                            getRandomFreespaceDepthOffset depth x y, 1.0f
 
                 let wpos = worldPosition x y depthOffset
                 let swpos = SCNVector3 (wpos.X, wpos.Y, wpos.Z)

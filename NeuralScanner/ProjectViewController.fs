@@ -45,7 +45,7 @@ type ProjectViewController (project : Project) =
                                               learningRateToSlider)
 
     let previewResolutionSlider = new ValueSlider ("Resolution", "0",
-                                                   16.0f, 512.0f,
+                                                   16.0f, 256.0f,
                                                    (fun x -> MathF.Round x),
                                                    (fun x -> x))
     let previewButton = UIButton.FromType(UIButtonType.RoundedRect)
@@ -494,9 +494,24 @@ type ProjectViewController (project : Project) =
             if cs.Length > 10 then
                 cs.[0].RemoveFromParentNode ()
             parent.AddChildNode n
+        inNode.Opacity <- nfloat 0.0
+        outNode.Opacity <- nfloat 0.0
+        freeNode.Opacity <- nfloat 0.0
         SCNTransaction.Begin ()
+        SCNTransaction.AnimationDuration <- 1.5
         addNode insidePointsNode inNode
         addNode outsidePointsNode outNode
         addNode freespacePointsNode freeNode
+        inNode.Opacity <- nfloat 1.0
+        outNode.Opacity <- nfloat 1.0
+        freeNode.Opacity <- nfloat 1.0
+        SCNTransaction.SetCompletionBlock (fun () ->
+            SCNTransaction.Begin ()
+            SCNTransaction.AnimationDuration <- 1.5
+            inNode.Opacity <- nfloat 0.0
+            outNode.Opacity <- nfloat 0.0
+            freeNode.Opacity <- nfloat 0.0
+            SCNTransaction.Commit ()
+            ())
         SCNTransaction.Commit ()
 

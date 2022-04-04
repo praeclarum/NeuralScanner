@@ -281,7 +281,7 @@ type TrainingService (project : Project) =
                 //let p = x.[i] - data.VolumeCenter
                 let p = data.ClipWorldPoint x.[i]
                 if data.IsClipPointOccupied p then
-                    let input = Tensor.Array(p.X, p.Y, p.Z, 1.0f)
+                    let input = Tensor.Array (p.X, p.Y, p.Z, 1.0f)
                     let inputs = tpool.Rent 1
                     inputs.[0] <- input
                     batchTensors.Add inputs
@@ -290,8 +290,9 @@ type TrainingService (project : Project) =
                     yspan.[i] <- outsideSdf
             let nin = batchTensors.Count
             if nin > 0 then
-                let results = model.Predict(batchTensors.ToArray (), nin)
-                for i in 0..(nin - 1) do
+                let nbatch = batchTensors.Count
+                let results = model.Predict (batchTensors.ToArray (), nbatch)
+                for i in 0..(nbatch - 1) do
                     tpool.Return batchTensors.[i]
                 //tapool.Return batchTensors
                 for i in 0..(nin-1) do
