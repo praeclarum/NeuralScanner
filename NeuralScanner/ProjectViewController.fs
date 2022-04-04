@@ -320,10 +320,10 @@ type ProjectViewController (project : Project) =
             trainingService.Changed.Subscribe (fun _ ->
                 this.BeginInvokeOnMainThread (fun _ ->
                     this.UpdateUI ()))
-            trainingService.BatchTrained.Subscribe (fun (batchSize, totalTrained, loss) ->
+            trainingService.BatchTrained.Subscribe (fun (batchSize, numPointsPerEpoch, loss, batchData) ->
+                this.HandleBatchData batchData
                 this.BeginInvokeOnMainThread (fun _ ->
-                    lossView.AddLoss (batchSize, totalTrained, loss)))
-            trainingService.NewBatchData.Subscribe this.HandleBatchData
+                    lossView.AddLoss (batchSize, project.Settings.TotalTrainedPoints, project.Settings.TotalTrainedSeconds, numPointsPerEpoch, loss)))
 
             learningRateSlider.ValueChanged.Subscribe (fun lr ->
                 project.Settings.LearningRate <- lr

@@ -94,7 +94,7 @@ type Project (settings : ProjectSettings, projectDir : string) =
         let config = this.Settings.Config
         Threading.ThreadPool.QueueUserWorkItem (fun _ ->
             lock saveMonitor (fun () ->
-                printfn "SAVE TO: %s" settingsPath
+                printfn "SAVE PROJECT: %s" settingsPath
                 config.Write (settingsPath)
                 //let fileOutput = IO.File.ReadAllText(settingsPath)
                 //printfn "FILE:\n%s" fileOutput
@@ -109,12 +109,16 @@ and ProjectSettings (name : string,
                      resolution : float32,
                      clipScale : Vector3,
                      clipRotationDegrees : Vector3,
-                     clipTranslation : Vector3
+                     clipTranslation : Vector3,
+                     [<ConfigDefault (0)>] totalTrainedPoints : int,
+                     [<ConfigDefault (0)>] totalTrainedSeconds : int
                     ) =
     inherit Configurable ()
 
     member val Name = name with get, set
     member val LearningRate = learningRate with get, set
+    member val TotalTrainedPoints = totalTrainedPoints with get, set
+    member val TotalTrainedSeconds = totalTrainedSeconds with get, set
     member val ModifiedUtc = modifiedUtc with get, set
     member val Resolution = resolution with get, set
     member val ClipScale : Vector3 = clipScale with get, set
@@ -122,7 +126,7 @@ and ProjectSettings (name : string,
     member val ClipTranslation : Vector3 = clipTranslation with get, set
 
     override this.Config =
-        base.Config.Add("name", this.Name).Add("learningRate", this.LearningRate).Add("modifiedUtc", this.ModifiedUtc).Add("resolution", this.Resolution).Add("clipScale", this.ClipScale).Add("clipRotationDegrees", this.ClipRotationDegrees).Add("clipTranslation", this.ClipTranslation)
+        base.Config.Add("name", this.Name).Add("learningRate", this.LearningRate).Add("modifiedUtc", this.ModifiedUtc).Add("resolution", this.Resolution).Add("clipScale", this.ClipScale).Add("clipRotationDegrees", this.ClipRotationDegrees).Add("clipTranslation", this.ClipTranslation).Add("totalTrainedPoints", this.TotalTrainedPoints).Add("totalTrainedSeconds", this.TotalTrainedSeconds)
 
 
 module ProjectManager =
@@ -154,7 +158,9 @@ module ProjectManager =
                                              ProjectDefaults.resolution,
                                              Vector3.One * ProjectDefaults.clipScale,
                                              Vector3.Zero,
-                                             Vector3.Zero
+                                             Vector3.Zero,
+                                             totalTrainedPoints = 0,
+                                             totalTrainedSeconds = 0
                                             )
                     try
                         s.Save (settingsPath)

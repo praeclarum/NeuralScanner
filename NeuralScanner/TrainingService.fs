@@ -91,12 +91,6 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
 
 type TrainingService (project : Project) =
 
-    let dataDir = project.CaptureDirectory
-
-    let changed = Event<_> ()
-
-    let mutable training : Threading.CancellationTokenSource option = None
-
     // Hyperparameters
     let outputScale = 200.0f
     let samplingDistance = 1.0e-3f
@@ -110,12 +104,15 @@ type TrainingService (project : Project) =
 
     let numEpochs = 1_000
 
-    // Derived parameters
+    let weightsInit = WeightsInit.Default
 
+    // State
+    let dataDir = project.CaptureDirectory
+
+    let changed = Event<_> ()
     let batchTrained = Event<_> ()
-    let newBatchData = Event<_> ()
 
-    let weightsInit = WeightsInit.Default//.GlorotUniform (0.54f) //.Uniform (-0.02f, 0.02f)
+    let mutable training : Threading.CancellationTokenSource option = None
 
     let reportError (e : exn) =
         printfn "ERROR: %O" e
@@ -205,8 +202,6 @@ type TrainingService (project : Project) =
         let model = tmodel.Submodels.[0]
         model
 
-    let mutable trainedPoints = 0
-
     let losses = ResizeArray<float32> ()
 
     let outsideDistance = lossClipDelta
@@ -219,7 +214,6 @@ type TrainingService (project : Project) =
     member this.Losses = losses.ToArray ()
 
     member this.BatchTrained = batchTrained.Publish
-    member this.NewBatchData = newBatchData.Publish
 
     member this.Changed = changed.Publish
 
@@ -227,38 +221,45 @@ type TrainingService (project : Project) =
 
     member this.TrainingId = trainingId
 
-    member this.SnapshotId = sprintf "%s_%d" this.TrainingId trainedPoints
+    member this.SnapshotId = sprintf "%s_%d" this.TrainingId project.Settings.TotalTrainedPoints
 
     member private this.Train (cancel : Threading.CancellationToken) =
         //let data = SdfDataSet ("/Users/fak/Data/NeuralScanner/Onewheel")
         //let struct(inputs, outputs) = data.GetRow(0, null)
-        let mutable totalTrained = 0
+        let mutable ntrained = 0
+
+        let startSeconds = project.Settings.TotalTrainedSeconds
+        let stopwatch = new Diagnostics.Stopwatch ()
+        stopwatch.Start ()
 
         try
             let trainingModel = getTrainingModel ()
             printfn "%O" trainingModel
             let dataSource = data.Value
+            let numPointsPerEpoch = dataSource.Count
             let callback (h : TrainingHistory.BatchHistory) =
                 //printfn "LOSS %g" h.AverageLoss
                 h.ContinueTraining <- not cancel.IsCancellationRequested
-                totalTrained <- batchSize + totalTrained
+                ntrained <- ntrained + h.BatchSize
+                project.Settings.TotalTrainedPoints <- project.Settings.TotalTrainedPoints + h.BatchSize
+                project.Settings.TotalTrainedSeconds <- startSeconds + (int stopwatch.Elapsed.TotalSeconds)
                 let loss = h.AverageLoss
                 losses.Add (loss)
-                batchTrained.Trigger (batchSize, totalTrained, loss)
-                newBatchData.Trigger (dataSource.PopLastTrainingData ())
+                batchTrained.Trigger (batchSize, numPointsPerEpoch, loss, dataSource.PopLastTrainingData ())
             optimizer.LearningRate <- project.Settings.LearningRate
             //this.GenerateMesh ()
             let mutable epoch = 0
             while not cancel.IsCancellationRequested && epoch < numEpochs do
                 let history = trainingModel.Fit (dataSource, batchSize = batchSize, epochs = 1.0f, callback = fun h -> callback h)
-                trainedPoints <- trainedPoints + history.Batches.Length * batchSize
                 epoch <- epoch + 1
         with ex ->
             reportError ex
-        if totalTrained > 0 then
-            this.Save ()
+        stopwatch.Stop ()
+        if ntrained > 0 then
+            this.SaveModel ()
+            project.SetModified "Settings"
 
-    member this.Save () =
+    member this.SaveModel () =
         match trainingModelO with
         | None -> ()
         | Some trainingModel ->
@@ -365,7 +366,9 @@ type TrainingService (project : Project) =
             trainingModelO <- None
             data <- lazy SdfDataSet (project, samplingDistance, outputScale)
             trainingId <- newTrainingId ()
-            trainedPoints <- 0
+            project.Settings.TotalTrainedPoints <- 0
+            project.Settings.TotalTrainedSeconds <- 0
+            project.SetModified "Settings"
         with ex ->
             reportError ex
 
