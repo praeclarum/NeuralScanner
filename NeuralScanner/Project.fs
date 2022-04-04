@@ -7,7 +7,7 @@ open SceneKit
 open MetalTensors
 
 module ProjectDefaults =
-    let learningRate = 5.0e-4f
+    let learningRate = 1.0e-3f
     let resolution = 32.0f
     let clipScale = 0.5f
 
@@ -32,14 +32,18 @@ type Project (settings : ProjectSettings, projectDir : string) =
 
     member this.Settings = settings
 
-    member this.Name with get () = this.Settings.Name
+    member this.Name with get () : string = this.Settings.Name
                      and set v = this.Settings.Name <- v; this.SetModified "Name"
+    member this.ExportFileName =
+        let n = this.Name.Trim ()
+        if n.Length > 0 then n
+        else "Untitled"
 
     member this.NumCaptures = captureFiles.Length
     member this.NewFrameIndex = this.NumCaptures
 
     member this.SaveSolidMesh (mesh : SdfKit.Mesh, meshId : string) : string =
-        let path = Path.Combine (projectDir, sprintf "%s_SolidMesh_%s.obj" this.Name meshId)
+        let path = Path.Combine (projectDir, sprintf "%s_SolidMesh_%s.obj" this.ExportFileName meshId)
         let tpath = Path.GetTempFileName ()
         mesh.WriteObj (tpath)
         if File.Exists path then

@@ -415,14 +415,15 @@ type ProjectViewController (project : Project) =
                 let mid = sprintf "%s_%d" trainingService.SnapshotId (int project.Settings.Resolution)
                 let voxels = trainingService.GenerateVoxels (setProgress)
                 let mesh = trainingService.GenerateMesh voxels
-                let meshPathTask = Threading.Tasks.Task.Run(fun () -> project.SaveSolidMesh (mesh, mid)).ContinueWith(fun (t : Threading.Tasks.Task<string>) ->
-                    if t.Exception <> null then
-                        this.ShowError t.Exception
-                    elif t.IsCompletedSuccessfully then
-                        this.BeginInvokeOnMainThread (fun () ->
-                            viewingMeshPath <- Some t.Result
-                            this.UpdateUI ()))
-
+                if mesh.Triangles.Length > 0 then
+                    let meshPathTask = Threading.Tasks.Task.Run(fun () -> project.SaveSolidMesh (mesh, mid)).ContinueWith(fun (t : Threading.Tasks.Task<string>) ->
+                        if t.Exception <> null then
+                            this.ShowError t.Exception
+                        elif t.IsCompletedSuccessfully then
+                            this.BeginInvokeOnMainThread (fun () ->
+                                viewingMeshPath <- Some t.Result
+                                this.UpdateUI ()))
+                    ()
                 let vnode = this.CreateSolidVoxelsNode voxels
                 vnode.Hidden <- not (visibleTypes.HasFlag (ViewObjectType.SolidVoxels))
                 let node = this.CreateSolidMeshNode mesh

@@ -270,11 +270,18 @@ type TrainingService (project : Project) =
             printfn "SAVED MODEL: %s" trainingModelPath
 
     member this.GenerateVoxels (progress : float32 -> unit) =
-        let nx, ny, nz = int project.Settings.Resolution, int project.Settings.Resolution, int project.Settings.Resolution
-        let mutable numPoints = 0
-        let totalPoints = nx*ny*nz
-
         let data = data.Value
+
+        let volumeDims = data.VolumeMax - data.VolumeMin
+        let minDim = min (min volumeDims.X volumeDims.Y) volumeDims.Z
+        let nPerDim = project.Settings.Resolution / minDim
+        let nx = ((int (round (nPerDim * volumeDims.X)) + 1) / 2) * 2
+        let ny = ((int (round (nPerDim * volumeDims.Y)) + 1) / 2) * 2
+        let nz = ((int (round (nPerDim * volumeDims.Z)) + 1) / 2) * 2
+
+        let totalPoints = nx*ny*nz
+        let mutable numPoints = 0
+
         let model = getModel ()
 
         let tpool = System.Buffers.ArrayPool<Tensor>.Shared
