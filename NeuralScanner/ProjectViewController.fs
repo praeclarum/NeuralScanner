@@ -240,10 +240,12 @@ type ProjectViewController (project : Project) =
         captureButton.Hidden <- project.NumCaptures > 0
         if trainingService.IsTraining then
             trainButton.Enabled <- false
+            resetTrainButton.Enabled <- false
             pauseTrainButton.Enabled <- true
         else
             trainButton.Enabled <- project.NumCaptures > 0
             pauseTrainButton.Enabled <- false
+            resetTrainButton.Enabled <- true
         if not learningRateSlider.UserInteracting then
             learningRateSlider.Value <- project.Settings.LearningRate
         if not previewResolutionSlider.UserInteracting then
@@ -337,6 +339,8 @@ type ProjectViewController (project : Project) =
 
             captureButton.TouchUpInside.Subscribe(fun _ -> this.HandleCapture())
             trainButton.TouchUpInside.Subscribe (fun _ ->
+                trainButton.Enabled <- false
+                resetTrainButton.Enabled <- false
                 trainingService.Run ()
                 this.UpdateUI ())
             pauseTrainButton.TouchUpInside.Subscribe (fun _ ->
