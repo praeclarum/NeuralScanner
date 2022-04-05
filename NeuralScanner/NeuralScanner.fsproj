@@ -84,10 +84,13 @@
     <Reference Include="mscorlib" />
     <Reference Include="Xamarin.iOS" />
     <Reference Include="SdfKit">
-      <HintPath>..\packages\SdfKit.0.2.14\lib\netstandard2.1\SdfKit.dll</HintPath>
+      <HintPath>..\packages\SdfKit.0.3.16\lib\netstandard2.1\SdfKit.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Numerics.Vectors" />
+    <Reference Include="MathNet.Numerics">
+      <HintPath>..\packages\MathNet.Numerics.5.0.0\lib\netstandard2.0\MathNet.Numerics.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Resources\" />
@@ -101,7 +104,6 @@
     <InterfaceDefinition Include="Main.storyboard" />
     <Compile Include="SceneKitGeometry.fs" />
     <Compile Include="SdfFrame.fs" />
-    <Compile Include="SdfFrameRegistration.fs" />
     <Compile Include="Project.fs" />
     <Compile Include="SdfDataSource.fs" />
     <Compile Include="Meshes.fs" />

@@ -170,9 +170,14 @@ type SdfFrame (depthPath : string) =
         m.M23 <- m.M23 * iscale
         m
     let projection = loadMatrix (filePath "Projection.txt")
-    let transform =
+
+    let mutable camToWorldTransform =
         let m = loadMatrix (filePath "Transform.txt")
         Matrix4x4.Transpose(m)
+
+    let mutable camToClipTransform = camToWorldTransform
+    let mutable clipToWorldTransform = Matrix4x4.Identity
+    let mutable worldToClipTransform = Matrix4x4.Identity
 
     let index x y = y * width + x
 
@@ -184,30 +189,17 @@ type SdfFrame (depthPath : string) =
 
     let worldPosition (x : int) (y : int) depthOffset : Vector3 =
         let camPos = cameraPosition x y depthOffset
-        // World = Transform * Camera
-        // World = Camera * Transform'
-        //let testResult = Vector4.Transform(Vector4.UnitW, transform)
-        let v4 = Vector4.Transform(camPos, transform)
-        Vector3 (v4.X, v4.Y, v4.Z)
-
-    let mutable camToClipTransform = transform
-    let mutable clipToWorldTransform = transform
+        Vector3.Transform (camPos, camToWorldTransform)
 
     let clipPosition (x : int) (y : int) depthOffset : Vector3 =
         let camPos = cameraPosition x y depthOffset
-        // World = Transform * Camera
-        // World = Camera * Transform'
-        //let testResult = Vector4.Transform(Vector4.UnitW, transform)
-        let v4 = Vector4.Transform(camPos, camToClipTransform)
-        Vector3 (v4.X, v4.Y, v4.Z)
+        Vector3.Transform(camPos, camToClipTransform)
 
-    let centerPos = worldPosition (width/2) (height/2) 0.0f
+    //do printfn "FRAME %s center=%A" (IO.Path.GetFileName(depthPath)) (worldPosition (width/2) (height/2) 0.0f)
 
-    do printfn "FRAME %s center=%g, %g, %g" (IO.Path.GetFileName(depthPath)) centerPos.X centerPos.Y centerPos.Z
-
-    let vector4Shape = [| 4 |]
-    let freespaceShape = [| 1 |]
-    let distanceShape = [| 1 |]
+    static let vector4Shape = [| 4 |]
+    static let freespaceShape = [| 1 |]
+    static let distanceShape = [| 1 |]
 
     let mutable inboundIndices = [||]
 
@@ -317,9 +309,10 @@ type SdfFrame (depthPath : string) =
                         inbounds.Add(i)
         inboundIndices <- inbounds.ToArray ()
 
-    member this.SetBoundsInverseTransform (newWorldToClipTransform : Matrix4x4, newClipToWorldTransform : Matrix4x4, occupancy : AxisOccupancy) =
-        camToClipTransform <- transform * newWorldToClipTransform
+    member this.SetClip (newWorldToClipTransform : Matrix4x4, newClipToWorldTransform : Matrix4x4, occupancy : AxisOccupancy) =
         clipToWorldTransform <- newClipToWorldTransform
+        worldToClipTransform <- newWorldToClipTransform
+        camToClipTransform <- camToWorldTransform * worldToClipTransform
         let inbounds = ResizeArray<_>()
         for x in 0..(width-1) do
             for y in 0..(height-1) do
@@ -420,3 +413,7 @@ type SdfFrame (depthPath : string) =
             let y = index / width
             r.[ii] <- worldPosition x y 0.0f
         n, r
+
+    member this.Register (registrationTransform : Matrix4x4) =
+        camToWorldTransform <- camToWorldTransform * registrationTransform
+        camToClipTransform <- camToWorldTransform * worldToClipTransform
