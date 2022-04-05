@@ -33,20 +33,12 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
 
     let occupancy = AxisOccupancy.Create 64
     let clipTransform, inverseClipTransform =
-        let tr = project.ClipTransform
-        let tr4 = Matrix4x4(tr.M11, tr.M12, tr.M13, tr.M14,
-                            tr.M21, tr.M22, tr.M23, tr.M24,
-                            tr.M31, tr.M32, tr.M33, tr.M34,
-                            tr.M41, tr.M42, tr.M43, tr.M44)
-        let mutable itr = tr
-        itr.Invert ()
-        let itr4 = Matrix4x4(itr.M11, itr.M12, itr.M13, itr.M14,
-                             itr.M21, itr.M22, itr.M23, itr.M24,
-                             itr.M31, itr.M32, itr.M33, itr.M34,
-                             itr.M41, itr.M42, itr.M43, itr.M44)
-        for f in frames do
-            f.SetClip (itr4, tr4, occupancy)
-        tr4, itr4
+        let clipToWorld = SceneKitGeometry.matrixFromSCNMatrix4 project.ClipTransform
+        let mutable worldToClip = clipToWorld
+        if Matrix4x4.Invert (clipToWorld, &worldToClip) then
+            for f in frames do
+                f.SetClip (worldToClip, clipToWorld, occupancy)
+        clipToWorld, worldToClip
     let unoccupied = occupancy.GetUnoccupied ()
 
     let createBatchData () : BatchTrainingData =
@@ -85,6 +77,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
                 let staticPoints = Span<Vector3>.op_Implicit (staticPointsA.AsSpan (0, nstaticPoints))
                 let icp = IterativeClosestPoint staticPoints
                 icp.MaxIterations <- 10
+                icp.GoodCorrespondenceDistance <- 0.01f
                 icp)
 
         let r = Parallel.ForEach (needsRegistration, ParallelOptions (MaxDegreeOfParallelism = 1), fun (f : SdfFrame) ->
@@ -92,9 +85,11 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
             let ndynamicPoints, dynamicPointsA = f.RentInBoundWorldPoints v3pool
             let dynamicPoints = dynamicPointsA.AsSpan (0, ndynamicPoints)
             let transform = icp.RegisterPoints (dynamicPoints)
-            let goodReg = transform.Translation.Length () < 1.0f
+            let goodReg = transform.Translation.Length () < 0.5f
             printfn "-REG %s = %A (%O)" f.Title transform.Translation goodReg
             if goodReg then
+                //let mutable itr = transform
+                //Matrix4x4.Invert (transform, &itr) |> ignore
                 f.Register transform
                 registered.Add f
                 project.SetChanged "Frames"
@@ -106,9 +101,12 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
     let registerFramesAsync () : Threading.Tasks.Task =
         if frames.Length > 1 then
             Threading.Tasks.Task.Run (fun () ->
+                printfn "REG START"
+                for i in 1..4 do
+                    registerFrames frames
+                    printfn "REG AGAIN!"
                 registerFrames frames
-                printfn "AGAIN!"
-                registerFrames frames)
+                printfn "REG COMPLETE")
         else
             Threading.Tasks.Task.CompletedTask
 

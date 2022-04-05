@@ -413,6 +413,7 @@ type ProjectViewController (project : Project) =
 
     member this.UpdatePointCloud () =
         SCNTransaction.Begin ()
+        SCNTransaction.AnimationDuration <- 1.0
         for fi in project.DepthPaths do
             let f = project.GetFrame fi
             if f.Visible then
@@ -421,6 +422,7 @@ type ProjectViewController (project : Project) =
                     n.Opacity <- nfloat 0.05
                     pointCloudNode.AddChildNode n
                     n)
+                node.WorldTransform <- SceneKitGeometry.matrixToSCNMatrix4 f.CameraToWorldTransform
                 node.Hidden <- false
             else
                 match framePointNodes.TryGetValue fi with

@@ -20,6 +20,18 @@ module MathOps =
 
 module SceneKitGeometry =
 
+    let matrixFromSCNMatrix4 (tr : SCNMatrix4) =
+        Matrix4x4 (tr.M11, tr.M12, tr.M13, tr.M14,
+                   tr.M21, tr.M22, tr.M23, tr.M24,
+                   tr.M31, tr.M32, tr.M33, tr.M34,
+                   tr.M41, tr.M42, tr.M43, tr.M44)
+
+    let matrixToSCNMatrix4 (tr : Matrix4x4) =
+        SCNMatrix4 (tr.M11, tr.M12, tr.M13, tr.M14,
+                    tr.M21, tr.M22, tr.M23, tr.M24,
+                    tr.M31, tr.M32, tr.M33, tr.M34,
+                    tr.M41, tr.M42, tr.M43, tr.M44)
+
     let createPointCloudGeometry (color : UIColor) (pointCoords : SCNVector3[]) : SCNGeometry =
         if pointCoords.Length = 0 then
             failwithf "No points provided"

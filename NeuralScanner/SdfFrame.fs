@@ -205,20 +205,16 @@ type SdfFrame (depthPath : string) =
 
     let minConfidence = 2uy
 
-    let pointCoords =
+    let pointGeometry =
         lazy
             let points = ResizeArray<SceneKit.SCNVector3>()
             for x in 0..(width-1) do
                 for y in 0..(height-1) do
                     let i = index x y
                     if confidences.[i] >= minConfidence then
-                        let p = worldPosition x y 0.0f
-                        points.Add (SceneKit.SCNVector3(p.X, p.Y, p.Z))
-            points.ToArray ()
-
-    let pointGeometry =
-        lazy
-            let pointCoords = pointCoords.Value
+                        let p = cameraPosition x y 0.0f
+                        points.Add (SceneKit.SCNVector3 (p.X, p.Y, p.Z))
+            let pointCoords = points.ToArray ()
             SceneKitGeometry.createPointCloudGeometry UIColor.White pointCoords
 
     let centerPoint =
@@ -291,6 +287,8 @@ type SdfFrame (depthPath : string) =
     member this.DepthPath = depthPath
 
     member this.CameraToWorldTransform = camToWorldTransform
+
+    member this.CameraToWorldSCNMatrix = camToWorldTransform
 
     member this.CenterPoint = centerPoint.Value
     member this.MinPoint = fst minMaxPoints.Value
