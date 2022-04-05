@@ -290,6 +290,8 @@ type SdfFrame (depthPath : string) =
 
     member this.DepthPath = depthPath
 
+    member this.CameraToWorldTransform = camToWorldTransform
+
     member this.CenterPoint = centerPoint.Value
     member this.MinPoint = fst minMaxPoints.Value
     member this.MaxPoint = snd minMaxPoints.Value

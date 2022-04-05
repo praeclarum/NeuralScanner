@@ -1,14 +1,16 @@
 ﻿namespace NeuralScanner
 
 open System
-open System.Runtime.InteropServices
+open System.Buffers
 open System.Collections.Concurrent
 open System.IO
 open System.Numerics
 open System.Globalization
+open System.Threading.Tasks
 
 open SceneKit
 open MetalTensors
+open SdfKit
 
 type SdfDataSet (project : Project, samplingDistance : float32, outputScale : float32) =
     inherit DataSet ()
@@ -55,34 +57,62 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         }
     let mutable batchData = createBatchData ()
 
-    let registerFrame (icp : SdfKit.IterativeClosestPoint) (dynamicFrame : SdfFrame) : Matrix4x4 =
-        let v3pool = System.Buffers.ArrayPool<Vector3>.Shared
-        let ndynamicPoints, dynamicPointsA = dynamicFrame.RentInBoundWorldPoints v3pool
-        let dynamicPoints = dynamicPointsA.AsSpan (0, ndynamicPoints)
-        let transform = icp.RegisterPoints (dynamicPoints)
-        v3pool.Return dynamicPointsA
-        transform
+    let registerFrames (frames : SdfFrame[]) =
+        let v3pool = ArrayPool<Vector3>.Shared
 
-    let registerFrames () : unit =
+        let transformDiff (x : SdfFrame) (y : SdfFrame) =
+            let dt = x.CameraToWorldTransform - y.CameraToWorldTransform
+            let drot = abs dt.M11 + abs dt.M22 + abs dt.M33
+            let dtrans = (x.CameraToWorldTransform.Translation - y.CameraToWorldTransform.Translation).Length ()
+            drot + dtrans
+        
+        let registered = ConcurrentBag<SdfFrame> ()
+        registered.Add frames.[0]
+        let needsRegistration =
+            frames.[1..]
+            |> Array.sortBy (transformDiff frames.[0])
+
+        let icps = ConcurrentDictionary<int, IterativeClosestPoint> ()
+            
+        let findNearestIcp (f : SdfFrame) : IterativeClosestPoint =
+            let rframe =
+                registered.ToArray()
+                |> Seq.sortBy (transformDiff f)
+                |> Seq.head
+            printfn "+REG %s WITH %s" f.Title rframe.Title
+            icps.GetOrAdd (rframe.FrameIndex, fun _ ->
+                let nstaticPoints, staticPointsA = rframe.RentInBoundWorldPoints v3pool
+                let staticPoints = Span<Vector3>.op_Implicit (staticPointsA.AsSpan (0, nstaticPoints))
+                let icp = IterativeClosestPoint staticPoints
+                icp.MaxIterations <- 10
+                icp)
+
+        let r = Parallel.ForEach (needsRegistration, ParallelOptions (MaxDegreeOfParallelism = 1), fun (f : SdfFrame) ->
+            let icp = findNearestIcp f
+            let ndynamicPoints, dynamicPointsA = f.RentInBoundWorldPoints v3pool
+            let dynamicPoints = dynamicPointsA.AsSpan (0, ndynamicPoints)
+            let transform = icp.RegisterPoints (dynamicPoints)
+            let goodReg = transform.Translation.Length () < 1.0f
+            printfn "-REG %s = %A (%O)" f.Title transform.Translation goodReg
+            if goodReg then
+                f.Register transform
+                registered.Add f
+                project.SetChanged "Frames"
+            v3pool.Return dynamicPointsA
+            ())
+
+        ()
+
+    let registerFramesAsync () : Threading.Tasks.Task =
         if frames.Length > 1 then
-            let f0 = frames.[0]
-            let v3pool = System.Buffers.ArrayPool<Vector3>.Shared
-            let nstaticPoints, staticPointsA = f0.RentInBoundWorldPoints v3pool
-            let staticPoints = Span<Vector3>.op_Implicit (staticPointsA.AsSpan (0, nstaticPoints))
-            let icp = SdfKit.IterativeClosestPoint staticPoints
+            Threading.Tasks.Task.Run (fun () ->
+                registerFrames frames
+                printfn "AGAIN!"
+                registerFrames frames)
+        else
+            Threading.Tasks.Task.CompletedTask
 
-            for fi in 1..3 do
-                let f = frames.[1]
-                let ndynamicPoints, dynamicPointsA = f.RentInBoundWorldPoints v3pool
-                let dynamicPoints = dynamicPointsA.AsSpan (0, ndynamicPoints)
-                let transform = icp.RegisterPoints (dynamicPoints)
-                let mutable itransform = transform
-                if Matrix4x4.Invert (transform, &itransform) then
-                    printfn "ITRANS: %A" itransform.Translation
-                    f.Register itransform
-                v3pool.Return dynamicPointsA
-
-    do registerFrames ()
+    let registerFramesTask = registerFramesAsync ()
 
     member this.Project = project
 
