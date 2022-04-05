@@ -35,7 +35,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         
     let volumeCenter = (volumeMin + volumeMax) * 0.5f
 
-    let occupancy = AxisOccupancy.Create 16
+    let occupancy = AxisOccupancy.Create 64
 
     //do for f in frames do f.FindInBoundPoints(volumeMin, volumeMax)
     let inverseClipTransform =

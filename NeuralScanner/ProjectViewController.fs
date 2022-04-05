@@ -59,7 +59,7 @@ type ProjectViewController (project : Project) =
     let previewButton = UIButton.FromType(UIButtonType.RoundedRect)
     do
         previewButton.TranslatesAutoresizingMaskIntoConstraints <- false
-        previewButton.SetTitle("Preview", UIControlState.Normal)
+        previewButton.SetTitle("Generate", UIControlState.Normal)
         previewButton.SetImage(UIImage.GetSystemImage "cube", UIControlState.Normal)
 
     let captureButton = UIButton.FromType(UIButtonType.RoundedRect)
