@@ -410,3 +410,13 @@ type SdfFrame (depthPath : string) =
                     if 0 <= xi && xi < nx && 0 <= yi && yi < ny && 0 <= zi && zi < nz then
                         voxels.[xi, yi, zi] <- voxels.[xi, yi, zi] + 1.0f
         ()
+
+    member this.RentInBoundWorldPoints (pool : Buffers.ArrayPool<Vector3>) : int * Vector3[] =
+        let n = inboundIndices.Length
+        let r = pool.Rent n
+        for ii in 0..(n-1) do
+            let index = inboundIndices.[ii]
+            let x = index % width
+            let y = index / width
+            r.[ii] <- worldPosition x y 0.0f
+        n, r
