@@ -81,6 +81,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
                 icp)
 
         let r = Parallel.ForEach (needsRegistration, ParallelOptions (MaxDegreeOfParallelism = 1), fun (f : SdfFrame) ->
+            NativeJunk.PointRegistration.SayHello ()
             let icp = findNearestIcp f
             let ndynamicPoints, dynamicPointsA = f.RentInBoundWorldPoints v3pool
             let dynamicPoints = dynamicPointsA.AsSpan (0, ndynamicPoints)
