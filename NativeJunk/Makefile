@@ -1,5 +1,8 @@
 CXX=clang++
-CXXFLAGS=-std=c++11 -stdlib=libc++ -frtti -fexceptions -fPIC -O3 -Wall -Werror -Wno-error=unused-variable -Wno-uninitialized-const-reference
+CXXFLAGS=-std=c++11 -stdlib=libc++ -frtti -fexceptions \
+	-ftemplate-depth=1024 -Qunused-arguments \
+	-fPIC -O3 -Wall -Werror \
+	-Wno-invalid-offsetof -Wno-error=unused-variable -Wno-uninitialized-const-reference -Wno-unnamed-type-template-args
 
 CPPSRCS=
 MMSRCS=NativeJunk.mm

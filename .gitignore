@@ -1,5 +1,6 @@
 .ionide
 Data
+NativeJunk/build
 
 # globs
 Makefile.in
