@@ -130,6 +130,10 @@
       <Name>MetalTensors.iOS</Name>
       <ReferenceSourceTarget>ProjectReference</ReferenceSourceTarget>
     </ProjectReference>
+    <ProjectReference Include="..\NativeJunk\NativeJunk.csproj">
+      <Project>{DF02C00B-68D4-4337-BC83-60A5CB5CD2B7}</Project>
+      <Name>NativeJunk</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.iOS.FSharp.targets" />
 </Project>
