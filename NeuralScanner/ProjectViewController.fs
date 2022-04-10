@@ -663,23 +663,56 @@ type ProjectViewController (project : Project) =
 
     override this.TouchesMoved (touchSet, e) =
         let touches = touchSet.ToArray<UITouch> ()
+        let v3 (dworld : SCNVector3) = System.Numerics.Vector3(dworld.X, dworld.Y, dworld.Z)
+        let getDWorld (t : UITouch) (node : SCNNode) =
+            let prevLoc = t.PreviousLocationInView sceneView
+            let currLoc = t.LocationInView sceneView
+            let boundsScreenPosition = sceneView.ProjectPoint (node.WorldPosition)
+            let prevWorldPos = sceneView.UnprojectPoint (SCNVector3 (float32 prevLoc.X, float32 prevLoc.Y, boundsScreenPosition.Z))
+            let currWorldPos = sceneView.UnprojectPoint (SCNVector3 (float32 currLoc.X, float32 currLoc.Y, boundsScreenPosition.Z))
+            currWorldPos - prevWorldPos
+
+        let moveHandle (hindex : int) (dworld : SCNVector3) =
+            let mutable minP = project.Settings.ClipTranslation - project.Settings.ClipScale
+            let mutable maxP = project.Settings.ClipTranslation + project.Settings.ClipScale
+            let oldHPos = boundsPos.[hindex]
+            if oldHPos.X < 0.0f then minP.X <- minP.X + dworld.X
+                                else maxP.X <- maxP.X + dworld.X
+            if oldHPos.Y < 0.0f then minP.Y <- minP.Y + dworld.Y
+                                else maxP.Y <- maxP.Y + dworld.Y
+            if oldHPos.Z < 0.0f then minP.Z <- minP.Z + dworld.Z
+                                else maxP.Z <- maxP.Z + dworld.Z
+            let newCenter = (maxP + minP) * 0.5f
+            let newScale = (maxP - minP) * 0.5f
+            project.Settings.ClipTranslation <- newCenter
+            project.Settings.ClipScale <- newScale
+            boundsNode.Transform <- project.ClipTransform
+            ()
+
+        SCNTransaction.Begin ()
+        SCNTransaction.DisableActions <- true
         for t in touches do
             match touchState with
             | NotTouching ->
                 // Something weird is happening
                 ()
             | SingleTouchOnBounds ->
-                let prevLoc = t.PreviousLocationInView sceneView
-                let currLoc = t.LocationInView sceneView
-                let boundsScreenPosition = sceneView.ProjectPoint (boundsNode.Position)
-                let prevWorldPos = sceneView.UnprojectPoint (SCNVector3 (float32 prevLoc.X, float32 prevLoc.Y, boundsScreenPosition.Z))
-                let currWorldPos = sceneView.UnprojectPoint (SCNVector3 (float32 currLoc.X, float32 currLoc.Y, boundsScreenPosition.Z))
-                let dworld = currWorldPos - prevWorldPos
+                let dworld = getDWorld t boundsNode
                 printf "DWORLD %A" dworld
-                boundsNode.Position <- boundsNode.Position + dworld
+                project.Settings.ClipTranslation <- project.Settings.ClipTranslation + v3 dworld
+                boundsNode.Transform <- project.ClipTransform
                 ()
-            | SingleTouchOnBoundsHandle _ ->
+            | SingleTouchOnBoundsHandle hindex ->
+                let node = boundsHandles.[hindex]
+                let dworld = getDWorld t node
+                printf "HANDLE DWORLD %A" dworld
+                //let lprev = node.Position
+                //node.WorldPosition <- node.WorldPosition + dworld
+                //let lcurr = node.Position
+                //let dlocal = lcurr - lprev
+                moveHandle hindex dworld
                 ()
+        SCNTransaction.Commit ()
 
     member private this.UpdateUIForTouchState () =
         printfn "TOUCH STATE = %A" touchState
