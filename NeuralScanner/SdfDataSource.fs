@@ -111,7 +111,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         else
             Threading.Tasks.Task.CompletedTask
 
-    let registerFramesTask = registerFramesAsync ()
+    //let registerFramesTask = registerFramesAsync ()
 
     member this.Project = project
 

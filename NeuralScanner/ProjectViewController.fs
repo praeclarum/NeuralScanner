@@ -26,6 +26,7 @@ type ProjectViewController (project : Project) =
 
     // State
     let mutable viewingMeshPath : string option = None
+    let mutable touchState = NotTouching
 
     // Services
     let trainingService = TrainingServices.getForProject (project)
@@ -130,6 +131,15 @@ type ProjectViewController (project : Project) =
     //    camNode.Transform <- t
     //    rootNode.AddChildNode camNode
     //    sceneView.PointOfView <- camNode
+    let boundsNode =
+        let g = SCNBox.Create (nfloat 2.0, nfloat 2.0, nfloat 2.0, nfloat 0.0)
+        let m = g.FirstMaterial
+        //m.Transparency <- nfloat 0.25
+        m.Diffuse.ContentColor <- UIColor.SystemGray
+        let n = SCNNode.FromGeometry g
+        n.Name <- "Bounds"
+        n
+    do rootNode.AddChildNode boundsNode
     let pointCloudNode = new SCNNode (Name = "PointCloud")
     do rootNode.AddChildNode pointCloudNode
     let insidePointsNode = new SCNNode (Name = "InsidePoints")
@@ -141,20 +151,12 @@ type ProjectViewController (project : Project) =
     let mutable roughMeshNode : SCNNode option = None
     let mutable solidMeshNode : SCNNode option = None
     let mutable solidVoxelsNode : SCNNode option = None
-    let boundsNode =
-        let g = SCNBox.Create (nfloat 2.0, nfloat 2.0, nfloat 2.0, nfloat 0.0)
-        let m = g.FirstMaterial
-        m.Transparency <- nfloat 0.25
-        let n = SCNNode.FromGeometry g
-        n.Name <- "Bounds"
-        n
-    do rootNode.AddChildNode boundsNode
 
     let mutable visibleTypes : ViewObjectType =
         ViewObjectType.DepthPoints
-        //||| ViewObjectType.Bounds
+        ||| ViewObjectType.Bounds
         //||| ViewObjectType.SolidVoxels
-        ||| ViewObjectType.RoughMesh
+        //||| ViewObjectType.RoughMesh
         ||| ViewObjectType.SolidMesh
         ||| ViewObjectType.InsidePoints
         ||| ViewObjectType.OutsidePoints
@@ -187,7 +189,7 @@ type ProjectViewController (project : Project) =
 
         sceneView.Frame <- this.View.Bounds
         sceneView.AutoresizingMask <- UIViewAutoresizing.FlexibleDimensions
-        sceneView.AllowsCameraControl <- true
+        sceneView.AllowsCameraControl <- false
 
         lossView.TranslatesAutoresizingMaskIntoConstraints <- false
 
@@ -554,6 +556,7 @@ type ProjectViewController (project : Project) =
                 material.Transparency <- nfloat 0.125
                 geometry.FirstMaterial <- material
                 let node = SCNNode.FromGeometry(geometry)
+                node.Name <- "Solid Voxels"
                 node
         else
             SCNNode.Create ()
@@ -608,3 +611,63 @@ type ProjectViewController (project : Project) =
                 ()
             this.PresentPopover (vc, exportMeshButton)
 
+    override this.TouchesBegan (touchSet, e) =
+        let touches = touchSet.ToArray<UITouch> ()
+        let hitOptions = SCNHitTestOptions(SearchMode = SCNHitTestSearchMode.All,
+                                           FirstFoundOnly = false,
+                                           BackFaceCulling = false,
+                                           IgnoreChildNodes = false,
+                                           SortResults = true)
+        for t in touches do
+            let locInSceneView = t.LocationInView sceneView
+            let hits = sceneView.HitTest (locInSceneView, hitOptions)
+            for h in hits do
+                printfn "HIT %O %s" h.Node h.Node.Name
+            let hitBounds = hits |> Array.tryFind (fun h -> h.Node = boundsNode)
+            match touchState with
+            | NotTouching ->
+                match hitBounds with
+                | Some h ->
+                    touchState <- SingleTouchOnBounds
+                | None ->
+                    // Touching empty space, move the camera
+                    ()
+            | SingleTouchOnBounds ->
+                match hitBounds with
+                | Some h ->
+                    // Already touching
+                    ()
+                | None ->
+                    touchState <- NotTouching
+        this.UpdateUIForTouchState ()
+
+    override this.TouchesMoved (touchSet, e) =
+        let touches = touchSet.ToArray<UITouch> ()
+        for t in touches do
+            match touchState with
+            | NotTouching ->
+                // Something weird is happening
+                ()
+            | SingleTouchOnBounds ->
+                let prevLoc = t.PreviousLocationInView sceneView
+                let currLoc = t.LocationInView sceneView
+                let boundsScreenPosition = sceneView.ProjectPoint (boundsNode.Position)
+                let prevWorldPos = sceneView.UnprojectPoint (SCNVector3 (float32 prevLoc.X, float32 prevLoc.Y, boundsScreenPosition.Z))
+                let currWorldPos = sceneView.UnprojectPoint (SCNVector3 (float32 currLoc.X, float32 currLoc.Y, boundsScreenPosition.Z))
+                let dworld = currWorldPos - prevWorldPos
+                printf "DWORLD %A" dworld
+                boundsNode.Position <- boundsNode.Position + dworld
+                ()
+
+    member private this.UpdateUIForTouchState () =
+        match touchState with
+        | NotTouching ->
+            boundsNode.Geometry.FirstMaterial.Diffuse.ContentColor <- UIColor.SystemGray
+        | SingleTouchOnBounds ->
+            boundsNode.Geometry.FirstMaterial.Diffuse.ContentColor <- sceneView.TintColor
+
+
+
+and TouchState =
+    | NotTouching
+    | SingleTouchOnBounds
