@@ -131,15 +131,38 @@ type ProjectViewController (project : Project) =
     //    camNode.Transform <- t
     //    rootNode.AddChildNode camNode
     //    sceneView.PointOfView <- camNode
+
+    let boundsPos =
+        [|
+            SCNVector3 (+1.0f, +1.0f, +1.0f)
+            SCNVector3 (+1.0f, +1.0f, -1.0f)
+            SCNVector3 (+1.0f, -1.0f, +1.0f)
+            SCNVector3 (+1.0f, -1.0f, -1.0f)
+            SCNVector3 (-1.0f, +1.0f, +1.0f)
+            SCNVector3 (-1.0f, +1.0f, -1.0f)
+            SCNVector3 (-1.0f, -1.0f, +1.0f)
+            SCNVector3 (-1.0f, -1.0f, -1.0f)
+        |]
+    let boundsHandles =
+        Array.init 8 (fun i ->
+            let g = SCNBox.Create (nfloat 0.2, nfloat 0.2, nfloat 0.2, nfloat 0.0)
+            let m = g.FirstMaterial
+            m.Diffuse.ContentColor <- UIColor.SystemGray
+            let n = SCNNode.FromGeometry g
+            n.Position <- boundsPos.[i]
+            n.Name <- sprintf "BoundsHandle%d" i
+            n)
     let boundsNode =
         let g = SCNBox.Create (nfloat 2.0, nfloat 2.0, nfloat 2.0, nfloat 0.0)
         let m = g.FirstMaterial
-        //m.Transparency <- nfloat 0.25
+        m.Transparency <- nfloat 0.25
         m.Diffuse.ContentColor <- UIColor.SystemGray
         let n = SCNNode.FromGeometry g
         n.Name <- "Bounds"
+        n.AddNodes boundsHandles
         n
     do rootNode.AddChildNode boundsNode
+
     let pointCloudNode = new SCNNode (Name = "PointCloud")
     do rootNode.AddChildNode pointCloudNode
     let insidePointsNode = new SCNNode (Name = "InsidePoints")
@@ -615,30 +638,27 @@ type ProjectViewController (project : Project) =
         let touches = touchSet.ToArray<UITouch> ()
         let hitOptions = SCNHitTestOptions(SearchMode = SCNHitTestSearchMode.All,
                                            FirstFoundOnly = false,
-                                           BackFaceCulling = false,
+                                           BackFaceCulling = true,
                                            IgnoreChildNodes = false,
                                            SortResults = true)
         for t in touches do
             let locInSceneView = t.LocationInView sceneView
             let hits = sceneView.HitTest (locInSceneView, hitOptions)
-            for h in hits do
-                printfn "HIT %O %s" h.Node h.Node.Name
+            //for h in hits do
+            //    printfn "HIT %O %s" h.Node h.Node.Name
             let hitBounds = hits |> Array.tryFind (fun h -> h.Node = boundsNode)
-            match touchState with
-            | NotTouching ->
+            let hitBoundHandle = hits |> Array.tryFind (fun h -> Array.contains h.Node boundsHandles)
+            match hitBoundHandle with
+            | Some h ->
+                let hindex = Array.IndexOf(boundsHandles, h.Node)
+                touchState <- SingleTouchOnBoundsHandle hindex
+            | _ ->
                 match hitBounds with
                 | Some h ->
                     touchState <- SingleTouchOnBounds
                 | None ->
-                    // Touching empty space, move the camera
-                    ()
-            | SingleTouchOnBounds ->
-                match hitBounds with
-                | Some h ->
-                    // Already touching
-                    ()
-                | None ->
                     touchState <- NotTouching
+                    ()
         this.UpdateUIForTouchState ()
 
     override this.TouchesMoved (touchSet, e) =
@@ -658,16 +678,31 @@ type ProjectViewController (project : Project) =
                 printf "DWORLD %A" dworld
                 boundsNode.Position <- boundsNode.Position + dworld
                 ()
+            | SingleTouchOnBoundsHandle _ ->
+                ()
 
     member private this.UpdateUIForTouchState () =
+        printfn "TOUCH STATE = %A" touchState
+        SCNTransaction.Begin ()
+        let unColor = UIColor.SystemGray
+        let selColor = sceneView.TintColor
         match touchState with
         | NotTouching ->
-            boundsNode.Geometry.FirstMaterial.Diffuse.ContentColor <- UIColor.SystemGray
+            boundsNode.Geometry.FirstMaterial.Diffuse.ContentColor <- unColor
+            boundsHandles |> Array.iter (fun n -> n.Geometry.FirstMaterial.Diffuse.ContentColor <- unColor)
         | SingleTouchOnBounds ->
-            boundsNode.Geometry.FirstMaterial.Diffuse.ContentColor <- sceneView.TintColor
+            boundsNode.Geometry.FirstMaterial.Diffuse.ContentColor <- selColor
+            boundsHandles |> Array.iter (fun n -> n.Geometry.FirstMaterial.Diffuse.ContentColor <- unColor)
+        | SingleTouchOnBoundsHandle hindex ->
+            boundsNode.Geometry.FirstMaterial.Diffuse.ContentColor <- unColor
+            boundsHandles |> Array.iteri (fun i n ->
+                let c = if i = hindex then selColor else unColor
+                n.Geometry.FirstMaterial.Diffuse.ContentColor <- c)
+        SCNTransaction.Commit ()
 
 
 
 and TouchState =
     | NotTouching
     | SingleTouchOnBounds
+    | SingleTouchOnBoundsHandle of HandleIndex : int
