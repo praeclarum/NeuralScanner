@@ -177,7 +177,7 @@ type ProjectViewController (project : Project) =
 
     let mutable visibleTypes : ViewObjectType =
         ViewObjectType.DepthPoints
-        ||| ViewObjectType.Bounds
+        //||| ViewObjectType.Bounds
         //||| ViewObjectType.SolidVoxels
         //||| ViewObjectType.RoughMesh
         ||| ViewObjectType.SolidMesh
@@ -292,9 +292,11 @@ type ProjectViewController (project : Project) =
             boundsNode.Transform <- t
             boundsNode.Hidden <- false
             viewBoundsButton.Selected <- true
+            sceneView.AllowsCameraControl <- false
         else
             boundsNode.Hidden <- true
             viewBoundsButton.Selected <- false
+            sceneView.AllowsCameraControl <- true
 
         if visibleTypes.HasFlag (ViewObjectType.DepthPoints) then
             pointCloudNode.Hidden <- false
