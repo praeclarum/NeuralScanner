@@ -73,7 +73,8 @@ let generateRoughVoxels (data : SdfDataSet) (progress : float32 -> unit) =
     let voxels = SdfKit.Voxels (data.VolumeMin, data.VolumeMax, nx, ny, nz)
 
     for f in data.Frames do
-        f.AddWorldPointsToVoxels voxels
+        if f.Visible then
+            f.AddWorldPointsToVoxels voxels
 
     let vs = voxels.Values
     for xi in 0..(nx - 1) do

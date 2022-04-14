@@ -338,7 +338,7 @@ type SdfFrame (depthPath : string) =
         // Half the time inside, half outside
         let clipPos, outputSignedDistance, free =
             let isFree = not inside && (StaticRandom.Next (2) = 1)
-            let useUnoccupied = isFree && (StaticRandom.Next (100) < 50)
+            let useUnoccupied = false // isFree && (StaticRandom.Next (100) < 50)
             if useUnoccupied then
                 let cp = getRandomUnoccupiedClipPoint unoccupied numOccCells
                 let wpos = Vector4.Transform (cp, clipToWorldTransform)
