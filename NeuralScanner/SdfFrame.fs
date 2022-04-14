@@ -327,6 +327,8 @@ type SdfFrame (depthPath : string) =
 
     member this.PointCount = inboundIndices.Length
 
+    member this.HasRows = inboundIndices.Length > 0
+
     member this.GetRow (inside: bool, poi : Vector3, samplingDistance : float32, outputScale : float32, unoccupied : OpenTK.Vector3i[], numOccCells : int, batchData : BatchTrainingData) : struct (Tensor[]*Tensor[]) =
         // i = y * width + x
         let index = inboundIndices.[StaticRandom.Next(inboundIndices.Length)]

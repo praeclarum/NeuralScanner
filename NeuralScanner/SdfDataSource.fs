@@ -131,7 +131,9 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
 
     override this.GetRow (index, _) =
         let inside = (index % 2) = 0
-        let fi = StaticRandom.Next(frames.Length)
+        let mutable fi = StaticRandom.Next(frames.Length)
+        while not (frames.[fi].HasRows) do
+            fi <- StaticRandom.Next(frames.Length)
         let struct (i, o) = frames.[fi].GetRow (inside, volumeCenter, samplingDistance, outputScale, unoccupied, occupancy.NumCells, batchData)
         //printfn "ROW%A D%A = %A" index inside i.[2].[0]
         struct (i, o)
