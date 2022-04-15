@@ -72,7 +72,7 @@ module SceneKitGeometry =
                 |> SCNGeometrySource.FromVertices
             let normsSource =
                 mesh.Normals
-                |> Array.map (fun v -> SCNVector3(-v.X, -v.Y, -v.Z))
+                |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))
                 |> SCNGeometrySource.FromNormals
             let element =
                 let elemStream = new IO.MemoryStream ()

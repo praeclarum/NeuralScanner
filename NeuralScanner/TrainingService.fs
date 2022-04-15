@@ -156,6 +156,7 @@ type TrainingService (project : Project) =
             let trainingModel = getTrainingModel ()
             printfn "%O" trainingModel
             let dataSource = data.Value
+            dataSource.WaitForRegistration ()
             let numPointsPerEpoch = dataSource.Count
             let callback (h : TrainingHistory.BatchHistory) =
                 //printfn "LOSS %g" h.AverageLoss

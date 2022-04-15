@@ -49,7 +49,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         }
     let mutable batchData = createBatchData ()
 
-    let registerFrames (frames : SdfFrame[]) =
+    let registerFramesOld (frames : SdfFrame[]) =
         let v3pool = ArrayPool<Vector3>.Shared
 
         let transformDiff (x : SdfFrame) (y : SdfFrame) =
@@ -62,6 +62,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         registered.Add frames.[0]
         let needsRegistration =
             frames.[1..]
+            |> Array.filter (fun x -> x.Visible)
             |> Array.sortBy (transformDiff frames.[0])
 
         let icps = ConcurrentDictionary<int, IterativeClosestPoint> ()
@@ -99,19 +100,58 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
 
         ()
 
+    let registerFramesNew (frames : SdfFrame[]) (pass : int) =
+        let v3pool = ArrayPool<Vector3>.Shared
+        let rented = ResizeArray<_>()
+
+        let frames =
+            frames
+            |> Array.filter(fun f -> f.Visible)
+            |> Array.sortBy(fun f -> f.FrameIndex)
+
+        let icp =
+            let nstaticPoints, staticPointsA = frames.[0].RentInBoundWorldPoints v3pool
+            rented.Add(staticPointsA)
+            let staticPoints = Span<Vector3>.op_Implicit (staticPointsA.AsSpan (0, nstaticPoints))
+            IterativeClosestPoint staticPoints
+        icp.MaxIterations <- 15
+        icp.GoodCorrespondenceDistance <- 0.005f
+        for i in 1..(frames.Length - 1) do
+            let f = frames.[i]
+            let ndynamicPoints, dynamicPointsA = f.RentInBoundWorldPoints v3pool
+            let dynamicPoints = dynamicPointsA.AsSpan (0, ndynamicPoints)
+            let transform = icp.RegisterPoints (dynamicPoints)
+            let goodReg = transform.Translation.Length () < 0.2f
+            printfn "-REG %s = %A (%O)" f.Title transform.Translation goodReg
+            if goodReg then
+                icp.AddStaticPoints (Span<Vector3>.op_Implicit dynamicPoints)
+                //let mutable itr = transform
+                //Matrix4x4.Invert (transform, &itr) |> ignore
+                if pass < 0 then
+                    for j in i..(frames.Length - 1) do
+                        frames.[j].Register transform
+                else
+                    frames.[i].Register transform
+                project.SetChanged "Frames"
+            v3pool.Return dynamicPointsA
+            ()
+
     let registerFramesAsync () : Threading.Tasks.Task =
         if frames.Length > 1 then
             Threading.Tasks.Task.Run (fun () ->
-                printfn "REG START"
-                for i in 1..4 do
-                    registerFrames frames
-                    printfn "REG AGAIN!"
-                registerFrames frames
+                let n = 1
+                for i in 1..n do
+                    printfn "REG START PASS %d/%d" i n
+                    registerFramesNew frames i
+                    printfn "REG END PASS %d/%d" i n
                 printfn "REG COMPLETE")
         else
             Threading.Tasks.Task.CompletedTask
 
     //let registerFramesTask = registerFramesAsync ()
+
+    //member this.WaitForRegistration () = registerFramesTask.Wait()
+    member this.WaitForRegistration () = ()
 
     member this.Project = project
 
