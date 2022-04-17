@@ -154,8 +154,9 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
             rented.Add(dynamicPointsA)
             let dynamicPoints = dynamicPointsA.AsSpan (0, ndynamicPoints)
 
-            let mutable mat = Matrix4x4.Identity
-            NativeJunk.PointRegistration.OpenGR(staticPoints, dynamicPoints, &mat)
+            //let mutable mat = Matrix4x4.Identity
+            //NativeJunk.PointRegistration.OpenGR(staticPoints, dynamicPoints, &mat)
+            NativeJunk.PointRegistration.IterativeClosestPoint(staticPoints, dynamicPoints)
 
         for i in 0..(rented.Count - 1) do
             v3pool.Return rented.[i]

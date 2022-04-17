@@ -14,6 +14,8 @@
 
 #include <Eigen/Dense>
 
+#include <ICP.h>
+
 
 // #include "../demo-utils.h"
 
@@ -115,8 +117,25 @@ void NativeJunk_SayHello() {
     NSLog (@"Hello, from NativeJunk 2!\n");
 }
 
-
-
+int32_t IterativeClosestPoint(const float *set1Data, int32_t set1NumPoints, float *set2Data, int32_t set2NumPoints, float *outputMat)
+{
+    Eigen::Matrix3Xd set1(3, set1NumPoints);
+    for (int i = 0; i < set1NumPoints; i++) {
+        set1(0, i) = set1Data[i * 3];
+        set1(1, i) = set1Data[i * 3 + 1];
+        set1(2, i) = set1Data[i * 3 + 2];
+    }
+    NSLog(@"Num points in set1: %ld", set1.cols());
+    Eigen::Matrix3Xd set2(3, set2NumPoints);
+    for (int i = 0; i < set2NumPoints; i++) {
+        set2(0, i) = set2Data[i * 3];
+        set2(1, i) = set2Data[i * 3 + 1];
+        set2(2, i) = set2Data[i * 3 + 2];
+    }
+    NSLog(@"Num points in set2: %ld", set2.cols());
+    ICP::point_to_point(set1, set2);
+    return 0;
+}
 
 int32_t OpenGRMain(const float *set1Data, int32_t set1NumPoints, float *set2Data, int32_t set2NumPoints, float *outputMat, float *outputScore) {
   using namespace gr;
