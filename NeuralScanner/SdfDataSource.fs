@@ -136,22 +136,63 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
             v3pool.Return dynamicPointsA
             ()
 
+    let registerFramesOpenGR (frames : SdfFrame[]) (pass : int) =
+        let v3pool = ArrayPool<Vector3>.Shared
+        let rented = ResizeArray<_>()
+
+        let frames =
+            frames
+            |> Array.filter(fun f -> f.Visible)
+            |> Array.sortBy(fun f -> f.FrameIndex)
+
+        let score =
+            let nstaticPoints, staticPointsA = frames.[0].RentInBoundWorldPoints v3pool
+            rented.Add(staticPointsA)
+            let staticPoints = Span<Vector3>.op_Implicit (staticPointsA.AsSpan (0, nstaticPoints))
+
+            let ndynamicPoints, dynamicPointsA = frames.[4].RentInBoundWorldPoints v3pool
+            rented.Add(dynamicPointsA)
+            let dynamicPoints = dynamicPointsA.AsSpan (0, ndynamicPoints)
+
+            let mutable mat = Matrix4x4.Identity
+            NativeJunk.PointRegistration.OpenGR(staticPoints, dynamicPoints, &mat)
+
+        for i in 0..(rented.Count - 1) do
+            v3pool.Return rented.[i]
+        ()
+
     let registerFramesAsync () : Threading.Tasks.Task =
         if frames.Length > 1 then
             Threading.Tasks.Task.Run (fun () ->
                 let n = 1
                 for i in 1..n do
                     printfn "REG START PASS %d/%d" i n
-                    registerFramesNew frames i
+                    registerFramesOpenGR frames i
                     printfn "REG END PASS %d/%d" i n
                 printfn "REG COMPLETE")
         else
             Threading.Tasks.Task.CompletedTask
 
-    //let registerFramesTask = registerFramesAsync ()
+    let registerFramesTask = registerFramesAsync ()
+    member this.WaitForRegistration () = registerFramesTask.Wait()
 
-    //member this.WaitForRegistration () = registerFramesTask.Wait()
-    member this.WaitForRegistration () = ()
+    //let testOpenGR() =
+    //    let staticPoints =
+    //        [|
+    //            Vector3(1f, 0f, 0f)
+    //            Vector3(0f, 1f, 0f)
+    //        |]
+    //    let dynamicPoints =
+    //        [|
+    //            Vector3(1.1f, 0f, 0f)
+    //            Vector3(0.1f, 1f, 0f)
+    //        |]
+    //    let mutable mat = Matrix4x4.Identity
+    //    let score = NativeJunk.PointRegistration.OpenGR(Span<Vector3>.op_Implicit (staticPoints.AsSpan()), dynamicPoints.AsSpan(), &mat)
+    //    ()
+    //do testOpenGR ()
+
+    //member this.WaitForRegistration () = ()
 
     member this.Project = project
 
