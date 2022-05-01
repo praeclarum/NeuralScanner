@@ -7,7 +7,7 @@ open SceneKit
 open MetalTensors
 
 module ProjectDefaults =
-    let learningRate = 1.0e-4f
+    let learningRate = 5.0e-4f
     let resolution = 32.0f
     let clipScale = 0.5f
 
@@ -16,7 +16,7 @@ module ProjectDefaults =
     let samplingDistance = 1.0e-3f
     let lossClipDelta = 1.0e-2f * outputScale
     let networkDepth = 8
-    let networkWidth = 512
+    let networkWidth = 256
     let batchSize = 2*1024
     let useTanh = false
     let dropoutRate = 0.2f
