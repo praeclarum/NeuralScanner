@@ -218,7 +218,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         let mutable fi = StaticRandom.Next(frames.Length)
         while not (frames.[fi].Visible && frames.[fi].HasRows) do
             fi <- StaticRandom.Next(frames.Length)
-        let struct (i, o) = frames.[fi].GetRow (inside, volumeCenter, samplingDistance, outputScale, unoccupied, occupancy.NumCells, batchData, numPositionEncodings)
+        let struct (i, o) = frames.[fi].GetRow (inside, volumeCenter, samplingDistance, outputScale, unoccupied, occupancy.NumCells, batchData, fi, frames.Length, numPositionEncodings)
         //printfn "ROW%A D%A = %A" index inside i.[2].[0]
         struct (i, o)
 

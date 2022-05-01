@@ -38,7 +38,7 @@ let generateSolidVoxels (model : Model) (data : SdfDataSet) (progress : float32 
             //let p = x.[i] - data.VolumeCenter
             let p = data.ClipWorldPoint x.[i]
             if data.IsClipPointOccupied p then
-                let input = PositionEncoding.encodePosition data.NumPositionEncodings p
+                let input = PositionEncoding.encodePosition 0 data.Frames.Length data.NumPositionEncodings p
                 let inputs = tpool.Rent 1
                 inputs.[0] <- input
                 batchTensors.Add inputs

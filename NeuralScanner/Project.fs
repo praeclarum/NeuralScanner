@@ -9,7 +9,7 @@ open MetalTensors
 module ProjectDefaults =
     let learningRate = 5.0e-4f
     let resolution = 32.0f
-    let clipScale = 0.5f
+    let clipScale = 0.5f //?nani
 
     // Hyperparameters
     let outputScale = 200.0f
@@ -18,9 +18,10 @@ module ProjectDefaults =
     let networkDepth = 8
     let networkWidth = 256
     let batchSize = 2*1024
-    let useTanh = false
-    let dropoutRate = 0.2f
     let numPositionEncodings = 10
+
+    let useTanh = false
+    let useFrameIndex = true
 
     // Derived
     let outsideDistance = lossClipDelta

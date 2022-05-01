@@ -70,8 +70,8 @@ type AxisOccupancy =
         unocc.ToArray ()
 
 module PositionEncoding =
-    let encodePosition (numPositionEncodings : int) (clipPos : Vector3) : Tensor =
-        let count = (3 + 6 * numPositionEncodings)
+    let encodePosition (frameIndex : int) (numFrames : int) (numPositionEncodings : int) (clipPos : Vector3) : Tensor =
+        let count = (3 + 6 * numPositionEncodings + numFrames)
         let a = Array.zeroCreate count
         a.[0] <- clipPos.X
         a.[1] <- clipPos.Y
@@ -85,6 +85,7 @@ module PositionEncoding =
             a.[j+3] <- MathF.Sin(w * clipPos.Y)
             a.[j+4] <- MathF.Cos(w * clipPos.Z)
             a.[j+5] <- MathF.Sin(w * clipPos.Z)
+        a.[3 + 6 * numPositionEncodings + frameIndex] <- 1.0f
         Tensor.Array ([| count |], a)
 
 
@@ -346,7 +347,7 @@ type SdfFrame (depthPath : string) =
 
     member this.HasRows = inboundIndices.Length > 0
 
-    member this.GetRow (inside: bool, poi : Vector3, samplingDistance : float32, outputScale : float32, unoccupied : OpenTK.Vector3i[], numOccCells : int, batchData : BatchTrainingData, numPositionEncodings : int) : struct (Tensor[]*Tensor[]) =
+    member this.GetRow (inside: bool, poi : Vector3, samplingDistance : float32, outputScale : float32, unoccupied : OpenTK.Vector3i[], numOccCells : int, batchData : BatchTrainingData, frameIndex : int, numFrames : int, numPositionEncodings : int) : struct (Tensor[]*Tensor[]) =
         // i = y * width + x
         let index = inboundIndices.[StaticRandom.Next(inboundIndices.Length)]
         let x = index % width
@@ -396,7 +397,7 @@ type SdfFrame (depthPath : string) =
         clipPos.Y <- Math.Clamp(clipPos.Y, -1.0f, 1.0f)
         clipPos.Z <- Math.Clamp(clipPos.Z, -1.0f, 1.0f)
 
-        let inputs = [| PositionEncoding.encodePosition numPositionEncodings clipPos
+        let inputs = [| PositionEncoding.encodePosition frameIndex numFrames numPositionEncodings clipPos
                         Tensor.Constant (free, freespaceShape)
                         Tensor.Constant (outputSignedDistance, distanceShape) |]
         struct (inputs, [| |])
