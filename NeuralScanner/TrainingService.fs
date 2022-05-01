@@ -43,17 +43,17 @@ type TrainingService (project : Project) =
 
     let createSdfModel () =
         let input = createInput ()
-        let hiddenLayer (x : Tensor) (i : int) (drop : bool) =
-            let r = x.Dense(networkWidth, weightsInit=weightsInit, name=sprintf "hidden%d" i).ReLU(sprintf "relu%d" i)
-            //if drop then r.Dropout(dropoutRate, name=sprintf "drop%d" i) else r
+        let hiddenLayer (x : Tensor) (i : int) =
+            let w = if i = 0 || i = networkDepth/2 then networkWidth * 2 else networkWidth
+            let r = x.Dense(w, weightsInit=weightsInit, name=sprintf "hidden%d" i).ReLU(sprintf "relu%d" i)
             r
         let houtput1 =
             (seq{0..(networkDepth/2-1)}
-             |> Seq.fold (fun a i -> hiddenLayer a i true) input)
+             |> Seq.fold hiddenLayer input)
         let inner = houtput1.Concat(input, name="skip")
         let houtput =
             (seq{networkDepth/2..(networkDepth-1)}
-             |> Seq.fold (fun a i -> hiddenLayer a i (i + 1 < networkDepth)) inner)
+             |> Seq.fold hiddenLayer inner)
         let output = houtput.Dense(1, weightsInit=weightsInit, name="raw_distance")
         let output = if useTanh then output.Tanh ("distance") else output
         let model = Model (input, output, "SDF")
