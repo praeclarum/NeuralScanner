@@ -39,7 +39,7 @@ type TrainingService (project : Project) =
         printfn "ERROR: %O" e
 
     let createInput () =
-        Tensor.Input("pos_enc", 6 * numPositionEncodings)
+        Tensor.Input("pos_enc", 3 + 6 * numPositionEncodings)
 
     let createSdfModel () =
         let input = createInput ()

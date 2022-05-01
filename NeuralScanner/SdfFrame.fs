@@ -71,17 +71,21 @@ type AxisOccupancy =
 
 module PositionEncoding =
     let encodePosition (numPositionEncodings : int) (clipPos : Vector3) : Tensor =
-        let a = Array.zeroCreate (6 * numPositionEncodings)
+        let count = (3 + 6 * numPositionEncodings)
+        let a = Array.zeroCreate count
+        a.[0] <- clipPos.X
+        a.[1] <- clipPos.Y
+        a.[2] <- clipPos.Z
         for i in 0..(numPositionEncodings-1) do
             let w = float32 (1 <<< i) * MathF.PI
-            let j = 6 * i
+            let j = 6 * i + 3
             a.[j] <- MathF.Cos(w * clipPos.X)
             a.[j+1] <- MathF.Sin(w * clipPos.X)
             a.[j+2] <- MathF.Cos(w * clipPos.Y)
             a.[j+3] <- MathF.Sin(w * clipPos.Y)
             a.[j+4] <- MathF.Cos(w * clipPos.Z)
             a.[j+5] <- MathF.Sin(w * clipPos.Z)
-        Tensor.Array ([| 6*numPositionEncodings |], a)
+        Tensor.Array ([| count |], a)
 
 
 type FrameConfig (visible : bool) =
