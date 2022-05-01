@@ -173,10 +173,12 @@ type TrainingService (project : Project) =
                 batchTrained.Trigger (batchSize, numPointsPerEpoch, loss, dataSource.PopLastTrainingData ())
             optimizer.LearningRate <- project.Settings.LearningRate
             //this.GenerateMesh ()
-            let mutable epoch = 0
-            while not cancel.IsCancellationRequested && epoch < numEpochs do
+            let mutable epoch = float project.Settings.TotalTrainedPoints / float numPointsPerEpoch
+            while not cancel.IsCancellationRequested && epoch < float numEpochs do
+                optimizer.LearningRate <- project.Settings.LearningRate * MathF.Pow(0.95f, float32 (floor epoch))
+                printfn "Learning Rate (e=%g [%g]): %g" epoch (floor epoch) optimizer.LearningRate
                 let history = trainingModel.Fit (dataSource, batchSize = batchSize, epochs = 1.0f, callback = fun h -> callback h)
-                epoch <- epoch + 1
+                epoch <- float project.Settings.TotalTrainedPoints / float numPointsPerEpoch
         with ex ->
             reportError ex
         stopwatch.Stop ()
