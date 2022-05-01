@@ -20,6 +20,7 @@ module ProjectDefaults =
     let batchSize = 2*1024
     let useTanh = false
     let dropoutRate = 0.2f
+    let numPositionEncodings = 8
 
     // Derived
     let outsideDistance = lossClipDelta

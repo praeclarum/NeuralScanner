@@ -21,6 +21,7 @@ type TrainingService (project : Project) =
     let networkWidth = ProjectDefaults.networkWidth
     let batchSize = ProjectDefaults.batchSize
     let useTanh = ProjectDefaults.useTanh
+    let numPositionEncodings = ProjectDefaults.numPositionEncodings
 
     let numEpochs = 1_000
 
@@ -37,8 +38,11 @@ type TrainingService (project : Project) =
     let reportError (e : exn) =
         printfn "ERROR: %O" e
 
+    let createInput () =
+        Tensor.Input("pos_enc", 6 * numPositionEncodings)
+
     let createSdfModel () =
-        let input = Tensor.Input("xyzw", 4)
+        let input = createInput ()
         let hiddenLayer (x : Tensor) (i : int) (drop : bool) =
             let r = x.Dense(networkWidth, weightsInit=weightsInit, name=sprintf "hidden%d" i).ReLU(sprintf "relu%d" i)
             //if drop then r.Dropout(dropoutRate, name=sprintf "drop%d" i) else r
@@ -61,7 +65,7 @@ type TrainingService (project : Project) =
     let optimizer = new AdamOptimizer (project.Settings.LearningRate)
 
     let createTrainingModel (sdfModel : Model) : Model =
-        let inputXyz = Tensor.Input("xyzw", 4)
+        let inputXyz = createInput ()
         let inputFreespace = Tensor.Input("freespace", 1)
         let inputExpected = Tensor.Input("distance", 1)
         let output = sdfModel.Call(inputXyz)
@@ -86,7 +90,7 @@ type TrainingService (project : Project) =
         printfn "%s" model.Summary
         model
 
-    let mutable data = lazy SdfDataSet (project, samplingDistance, outputScale)
+    let mutable data = lazy SdfDataSet (project, samplingDistance, outputScale, numPositionEncodings)
 
     //let modelPath = dataDir + "/Model.zip"
     let trainingModelPath = dataDir + "/TrainingModel.zip"
@@ -216,7 +220,7 @@ type TrainingService (project : Project) =
             if File.Exists trainingModelPath then
                 File.Delete trainingModelPath
             trainingModelO <- None
-            data <- lazy SdfDataSet (project, samplingDistance, outputScale)
+            data <- lazy SdfDataSet (project, samplingDistance, outputScale, numPositionEncodings)
             trainingId <- newTrainingId ()
             project.Settings.TotalTrainedPoints <- 0
             project.Settings.TotalTrainedSeconds <- 0

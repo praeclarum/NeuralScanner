@@ -69,6 +69,19 @@ type AxisOccupancy =
                         unocc.Add (OpenTK.Vector3i (xi, yi, zi))
         unocc.ToArray ()
 
+module PositionEncoding =
+    let encodePosition (numPositionEncodings : int) (clipPos : Vector3) : Tensor =
+        let a = Array.zeroCreate (6 * numPositionEncodings)
+        for i in 0..(numPositionEncodings-1) do
+            let w = float32 (1 <<< i) * MathF.PI
+            let j = 6 * i
+            a.[j] <- MathF.Cos(w * clipPos.X)
+            a.[j+1] <- MathF.Sin(w * clipPos.X)
+            a.[j+2] <- MathF.Cos(w * clipPos.Y)
+            a.[j+3] <- MathF.Sin(w * clipPos.Y)
+            a.[j+4] <- MathF.Cos(w * clipPos.Z)
+            a.[j+5] <- MathF.Sin(w * clipPos.Z)
+        Tensor.Array ([| 6*numPositionEncodings |], a)
 
 
 type FrameConfig (visible : bool) =
@@ -258,7 +271,7 @@ type SdfFrame (depthPath : string) =
         let mutable sampleDepth = depth * (0.9f + 0.09f*float32 (StaticRandom.NextDouble()))
         let mutable samplePos = clipPosition x y (sampleDepth - depth)
         let mutable n = 0
-        while n < 5 && ((abs samplePos.X) > 1.1f || (abs samplePos.Y) > 1.1f || abs samplePos.Z > 1.1f) do
+        while n < 5 && ((abs samplePos.X) > 0.999f || (abs samplePos.Y) > 0.999f || abs samplePos.Z > 0.999f) do
             sampleDepth <- 0.25f*sampleDepth + 0.75f*depth
             samplePos <- clipPosition x y (sampleDepth - depth)
             n <- n + 1
@@ -329,14 +342,14 @@ type SdfFrame (depthPath : string) =
 
     member this.HasRows = inboundIndices.Length > 0
 
-    member this.GetRow (inside: bool, poi : Vector3, samplingDistance : float32, outputScale : float32, unoccupied : OpenTK.Vector3i[], numOccCells : int, batchData : BatchTrainingData) : struct (Tensor[]*Tensor[]) =
+    member this.GetRow (inside: bool, poi : Vector3, samplingDistance : float32, outputScale : float32, unoccupied : OpenTK.Vector3i[], numOccCells : int, batchData : BatchTrainingData, numPositionEncodings : int) : struct (Tensor[]*Tensor[]) =
         // i = y * width + x
         let index = inboundIndices.[StaticRandom.Next(inboundIndices.Length)]
         let x = index % width
         let y = index / width
 
         // Half the time inside, half outside
-        let clipPos, outputSignedDistance, free =
+        let rawClipPos, outputSignedDistance, free =
             let isFree = not inside && (StaticRandom.Next (2) = 1)
             let useUnoccupied = false // isFree && (StaticRandom.Next (100) < 50)
             if useUnoccupied then
@@ -374,8 +387,12 @@ type SdfFrame (depthPath : string) =
                 let outputSignedDistance = -depthOffset * outputScale
                 clipPos, outputSignedDistance, free
 
+        let mutable clipPos = rawClipPos
+        clipPos.X <- Math.Clamp(clipPos.X, -1.0f, 1.0f)
+        clipPos.Y <- Math.Clamp(clipPos.Y, -1.0f, 1.0f)
+        clipPos.Z <- Math.Clamp(clipPos.Z, -1.0f, 1.0f)
 
-        let inputs = [| Tensor.Array (vector4Shape, clipPos.X, clipPos.Y, clipPos.Z, 1.0f)
+        let inputs = [| PositionEncoding.encodePosition numPositionEncodings clipPos
                         Tensor.Constant (free, freespaceShape)
                         Tensor.Constant (outputSignedDistance, distanceShape) |]
         struct (inputs, [| |])

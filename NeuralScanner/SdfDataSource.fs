@@ -12,7 +12,7 @@ open SceneKit
 open MetalTensors
 open SdfKit
 
-type SdfDataSet (project : Project, samplingDistance : float32, outputScale : float32) =
+type SdfDataSet (project : Project, samplingDistance : float32, outputScale : float32, numPositionEncodings : int) =
     inherit DataSet ()
 
     let dataDirectory = project.CaptureDirectory
@@ -174,8 +174,8 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
         else
             Threading.Tasks.Task.CompletedTask
 
-    let registerFramesTask = registerFramesAsync ()
-    member this.WaitForRegistration () = registerFramesTask.Wait()
+    //let registerFramesTask = registerFramesAsync ()
+    //member this.WaitForRegistration () = registerFramesTask.Wait()
 
     //let testOpenGR() =
     //    let staticPoints =
@@ -193,7 +193,7 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
     //    ()
     //do testOpenGR ()
 
-    //member this.WaitForRegistration () = ()
+    member this.WaitForRegistration () = ()
 
     member this.Project = project
 
@@ -201,22 +201,24 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
     member this.VolumeMax = volumeMax
     member this.VolumeCenter = volumeCenter
 
+    member this.NumPositionEncodings = numPositionEncodings
+
     member this.Frames = frames
 
     override this.Count = frames |> Array.sumBy (fun x -> x.PointCount)
 
-    member this.IsClipPointOccupied (clipPoint : Vector4) : bool =
+    member this.IsClipPointOccupied (clipPoint : Vector3) : bool =
         occupancy.IsOccupied (clipPoint.X, clipPoint.Y, clipPoint.Z)
 
-    member this.ClipWorldPoint (worldPoint : Vector3) =
-        Vector4.Transform (worldPoint, inverseClipTransform)
+    member this.ClipWorldPoint (worldPoint : Vector3) : Vector3 =
+        Vector3.Transform (worldPoint, inverseClipTransform)
 
     override this.GetRow (index, _) =
         let inside = (index % 2) = 0
         let mutable fi = StaticRandom.Next(frames.Length)
         while not (frames.[fi].Visible && frames.[fi].HasRows) do
             fi <- StaticRandom.Next(frames.Length)
-        let struct (i, o) = frames.[fi].GetRow (inside, volumeCenter, samplingDistance, outputScale, unoccupied, occupancy.NumCells, batchData)
+        let struct (i, o) = frames.[fi].GetRow (inside, volumeCenter, samplingDistance, outputScale, unoccupied, occupancy.NumCells, batchData, numPositionEncodings)
         //printfn "ROW%A D%A = %A" index inside i.[2].[0]
         struct (i, o)
 
