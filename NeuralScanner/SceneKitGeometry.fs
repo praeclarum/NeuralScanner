@@ -32,10 +32,9 @@ module SceneKitGeometry =
                     tr.M31, tr.M32, tr.M33, tr.M34,
                     tr.M41, tr.M42, tr.M43, tr.M44)
 
-    let createPointCloudGeometry (color : UIColor) (pointCoords : SCNVector3[]) : SCNGeometry =
+    let createPointCloudGeometryWithSources (sources : SCNGeometrySource[]) (pointCoords : SCNVector3[]) : SCNGeometry =
         if pointCoords.Length = 0 then
             failwithf "No points provided"
-        let source = SCNGeometrySource.FromVertices(pointCoords)
         let element =
             let elemStream = new IO.MemoryStream ()
             let elemWriter = new IO.BinaryWriter (elemStream)
@@ -45,15 +44,45 @@ module SceneKitGeometry =
             elemStream.Position <- 0L
             let data = NSData.FromStream (elemStream)
             SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Point, nint pointCoords.Length, nint 4)
-        let geometry = SCNGeometry.Create([|source|], [|element|])
+        let geometry = SCNGeometry.Create(sources, [|element|])
         element.PointSize <- nfloat 0.01f
         element.MinimumPointScreenSpaceRadius <- nfloat 0.1f
         element.MaximumPointScreenSpaceRadius <- nfloat 5.0f
         let material = SCNMaterial.Create ()
-        material.Emission.ContentColor <- color
         material.ReadsFromDepthBuffer <- true
         material.WritesToDepthBuffer <- true
         geometry.FirstMaterial <- material
+        geometry
+
+    let createPointCloudGeometry (color : UIColor) (pointCoords : SCNVector3[]) : SCNGeometry =
+        if pointCoords.Length = 0 then
+            failwithf "No points provided"
+        let source = SCNGeometrySource.FromVertices(pointCoords)
+        let geometry = createPointCloudGeometryWithSources [|source|] pointCoords
+        let material = geometry.FirstMaterial
+        material.Emission.ContentColor <- color
+        geometry
+
+    let createColoredPointCloudGeometry (colors : Vector3[]) (pointCoords : SCNVector3[]) : SCNGeometry =
+        if pointCoords.Length = 0 then
+            failwithf "No points provided"
+        let source = SCNGeometrySource.FromVertices(pointCoords)
+        let csource =
+            let elemStream = new IO.MemoryStream ()
+            let elemWriter = new IO.BinaryWriter (elemStream)
+            for i in 0..(colors.Length - 1) do
+                let c = colors.[i]
+                elemWriter.Write c.X
+                elemWriter.Write c.Y
+                elemWriter.Write c.Z
+            elemWriter.Flush ()
+            elemStream.Position <- 0L
+            let data = NSData.FromStream (elemStream)
+            SCNGeometrySource.FromData(data, SCNGeometrySourceSemantics.Color, nint colors.Length, true, nint 3, nint 4, nint 0, nint (3*4))
+        let geometry = createPointCloudGeometryWithSources [|source;csource|] pointCoords
+        let material = geometry.FirstMaterial
+        material.Diffuse.ContentColor <- UIColor.White
+        material.LightingModelName <- SCNLightingModel.Constant
         geometry
 
     let createPointCloudNode (color : UIColor) (pointCoords : SCNVector3[]) =
@@ -61,6 +90,14 @@ module SceneKitGeometry =
             SCNNode.Create ()
         else
             let g = createPointCloudGeometry color pointCoords
+            let n = SCNNode.FromGeometry g
+            n
+
+    let createColoredPointCloudNode (colors : Vector3[]) (pointCoords : SCNVector3[]) =
+        if pointCoords.Length = 0 then
+            SCNNode.Create ()
+        else
+            let g = createColoredPointCloudGeometry colors pointCoords
             let n = SCNNode.FromGeometry g
             n
 

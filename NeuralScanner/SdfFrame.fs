@@ -158,6 +158,18 @@ type SdfFrame (depthPath : string) =
         r.Close()
         confs
 
+    let colorBytes : byte[] =
+        let image = UIImage.FromFile(imagePath)
+        let bytes = Array.zeroCreate (4*width*height)
+        do
+            let cs = CoreGraphics.CGColorSpace.CreateGenericRgb()
+            let bc = new CoreGraphics.CGBitmapContext(bytes, nint width, nint height, nint 8, nint (4*width), cs, CoreGraphics.CGImageAlphaInfo.NoneSkipLast)
+            bc.DrawImage(CoreGraphics.CGRect(0.0, 0.0, float width, float height), image.CGImage)
+            bc.Flush()
+            bc.Dispose()
+            cs.Dispose()
+        bytes
+
     let pointCount = depths.Length
 
     let loadMatrix (path : string) =
@@ -198,6 +210,7 @@ type SdfFrame (depthPath : string) =
     let mutable worldToClipTransform = Matrix4x4.Identity
 
     let index x y = y * width + x
+    let colorIndex x y = y * (width * 4) + (x * 4)
 
     let cameraPosition (x : int) (y : int) depthOffset : Vector3 =
         let depth = -(depths.[index x y] + depthOffset)
@@ -226,14 +239,21 @@ type SdfFrame (depthPath : string) =
     let pointGeometry =
         lazy
             let points = ResizeArray<SceneKit.SCNVector3>()
+            let colors = ResizeArray<Vector3>()
             for x in 0..(width-1) do
                 for y in 0..(height-1) do
                     let i = index x y
+                    let ci = colorIndex x y
                     if confidences.[i] >= minConfidence then
                         let p = cameraPosition x y 0.0f
+                        let r = colorBytes.[ci]
+                        let g = colorBytes.[ci+1]
+                        let b = colorBytes.[ci+2]
                         points.Add (SceneKit.SCNVector3 (p.X, p.Y, p.Z))
+                        colors.Add (Vector3 (float32 r / 255.0f, float32 g / 255.0f, float32 b / 255.0f))
             let pointCoords = points.ToArray ()
-            SceneKitGeometry.createPointCloudGeometry UIColor.White pointCoords
+            //SceneKitGeometry.createPointCloudGeometry UIColor.White pointCoords
+            SceneKitGeometry.createColoredPointCloudGeometry (colors.ToArray()) pointCoords
 
     let centerPoint =
         lazy
@@ -404,10 +424,14 @@ type SdfFrame (depthPath : string) =
 
     member this.GetPointGeometry () = pointGeometry.Value
     member this.CreatePointNode (color : UIColor) =
-        let g = pointGeometry.Value.Copy (NSZone.Default) :?> SCNGeometry
-        let m = g.FirstMaterial.Copy (NSZone.Default) :?> SCNMaterial
-        m.Emission.ContentColor <- color
-        g.FirstMaterial <- m
+        let g = 
+            if color <> null then
+                let g = pointGeometry.Value.Copy (NSZone.Default) :?> SCNGeometry
+                let m = g.FirstMaterial.Copy (NSZone.Default) :?> SCNMaterial
+                m.Emission.ContentColor <- color
+                g.FirstMaterial <- m
+                g
+            else pointGeometry.Value
         let node = SCNNode.FromGeometry g
         node
 

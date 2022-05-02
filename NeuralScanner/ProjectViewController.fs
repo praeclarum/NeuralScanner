@@ -445,7 +445,7 @@ type ProjectViewController (project : Project) =
             let f = project.GetFrame fi
             if f.Visible then
                 let node = framePointNodes.GetOrAdd (fi, fun fi ->
-                    let n = f.CreatePointNode (UIColor.SystemOrange)
+                    let n = f.CreatePointNode (null)
                     n.Opacity <- nfloat 0.05
                     pointCloudNode.AddChildNode n
                     n)
