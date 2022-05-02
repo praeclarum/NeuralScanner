@@ -143,7 +143,10 @@ module VCUtils =
     let showException (ex : exn) (vc : UIViewController) =
         printfn "ERROR: %O" ex
         vc.BeginInvokeOnMainThread (fun _ ->
-            let alert = new UIAlertView ("Error", ex.ToString(), null, "OK")
+            let mutable iex = ex
+            while iex.InnerException <> null do
+                iex <- iex.InnerException
+            let alert = new UIAlertView (iex.GetType().Name, iex.Message, null, "OK")
             alert.Show ())
 
     let presentPopoverFromButtonItem (presentVC : UIViewController) (button : UIBarButtonItem) (vc : UIViewController) =
