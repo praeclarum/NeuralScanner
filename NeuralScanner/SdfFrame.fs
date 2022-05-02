@@ -226,6 +226,13 @@ type SdfFrame (depthPath : string) =
         let camPos = cameraPosition x y depthOffset
         Vector3.Transform(camPos, camToClipTransform)
 
+    let getColor (x : int) (y : int) : Vector3 =
+        let ci = colorIndex x y
+        let r = colorBytes.[ci]
+        let g = colorBytes.[ci+1]
+        let b = colorBytes.[ci+2]
+        Vector3 (float32 r / 255.0f, float32 g / 255.0f, float32 b / 255.0f)
+
     //do printfn "FRAME %s center=%A" (IO.Path.GetFileName(depthPath)) (worldPosition (width/2) (height/2) 0.0f)
 
     static let vector4Shape = [| 4 |]
@@ -246,11 +253,8 @@ type SdfFrame (depthPath : string) =
                     let ci = colorIndex x y
                     if confidences.[i] >= minConfidence then
                         let p = cameraPosition x y 0.0f
-                        let r = colorBytes.[ci]
-                        let g = colorBytes.[ci+1]
-                        let b = colorBytes.[ci+2]
                         points.Add (SceneKit.SCNVector3 (p.X, p.Y, p.Z))
-                        colors.Add (Vector3 (float32 r / 255.0f, float32 g / 255.0f, float32 b / 255.0f))
+                        colors.Add (getColor x y)
             let pointCoords = points.ToArray ()
             //SceneKitGeometry.createPointCloudGeometry UIColor.White pointCoords
             SceneKitGeometry.createColoredPointCloudGeometry (colors.ToArray()) pointCoords
@@ -450,6 +454,7 @@ type SdfFrame (depthPath : string) =
                     let zi = int (vf.Z * float32 nz)
                     if 0 <= xi && xi < nx && 0 <= yi && yi < ny && 0 <= zi && zi < nz then
                         voxels.[xi, yi, zi] <- voxels.[xi, yi, zi] + 1.0f
+                        voxels.Colors.[xi, yi, zi] <- voxels.Colors.[xi, yi, zi] + (getColor x y)
         ()
 
     member this.RentInBoundWorldPoints (pool : Buffers.ArrayPool<Vector3>) : int * Vector3[] =

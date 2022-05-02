@@ -77,10 +77,12 @@ let generateRoughVoxels (data : SdfDataSet) (progress : float32 -> unit) =
             f.AddWorldPointsToVoxels voxels
 
     let vs = voxels.Values
+    let cs = voxels.Colors
     for xi in 0..(nx - 1) do
         for yi in 0..(ny - 1) do
             for zi in 0..(nz - 1) do
                 if vs.[xi, yi, zi] >= 1.0f then
+                    cs.[xi, yi, zi] <- cs.[xi, yi, zi] / vs.[xi, yi, zi]
                     vs.[xi, yi, zi] <- -1.0f
                 else
                     vs.[xi, yi, zi] <- 1.0f

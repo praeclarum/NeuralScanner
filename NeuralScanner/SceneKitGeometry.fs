@@ -111,6 +111,18 @@ module SceneKitGeometry =
                 mesh.Normals
                 |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))
                 |> SCNGeometrySource.FromNormals
+            let colorsSource =
+                let elemStream = new IO.MemoryStream ()
+                let elemWriter = new IO.BinaryWriter (elemStream)
+                for i in 0..(mesh.Colors.Length - 1) do
+                    let c = mesh.Colors.[i]
+                    elemWriter.Write (c.X)
+                    elemWriter.Write (c.Y)
+                    elemWriter.Write (c.Z)
+                elemWriter.Flush ()
+                elemStream.Position <- 0L
+                let data = NSData.FromStream (elemStream)
+                SCNGeometrySource.FromData(data, SCNGeometrySourceSemantics.Color, nint mesh.Colors.Length, true, nint 3, nint 4, nint 0, nint (3*4))
             let element =
                 let elemStream = new IO.MemoryStream ()
                 let elemWriter = new IO.BinaryWriter (elemStream)
@@ -120,9 +132,9 @@ module SceneKitGeometry =
                 elemStream.Position <- 0L
                 let data = NSData.FromStream (elemStream)
                 SCNGeometryElement.FromData(data, SCNGeometryPrimitiveType.Triangles, nint (mesh.Triangles.Length / 3), nint 4)
-            let geometry = SCNGeometry.Create([|vertsSource;normsSource|], [|element|])
+            let geometry = SCNGeometry.Create([|vertsSource;normsSource;colorsSource|], [|element|])
             let material = SCNMaterial.Create ()
-            material.Diffuse.ContentColor <- UIColor.White
+            //material.Diffuse.ContentColor <- UIColor.White
             geometry.FirstMaterial <- material
             SCNNode.FromGeometry(geometry)
         else

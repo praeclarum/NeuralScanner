@@ -86,7 +86,7 @@
     <Reference Include="mscorlib" />
     <Reference Include="Xamarin.iOS" />
     <Reference Include="SdfKit">
-      <HintPath>..\packages\SdfKit.0.3.25\lib\netstandard2.1\SdfKit.dll</HintPath>
+      <HintPath>..\packages\SdfKit.0.4.26\lib\netstandard2.1\SdfKit.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Numerics.Vectors" />
