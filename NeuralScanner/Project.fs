@@ -18,7 +18,7 @@ module ProjectDefaults =
     let networkDepth = 8
     let networkWidth = 256
     let batchSize = 2*1024
-    let numPositionEncodings = 10
+    let numPositionEncodings = 4
 
     let useTanh = false
     let useFrameIndex = true
