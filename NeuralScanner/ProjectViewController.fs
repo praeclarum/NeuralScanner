@@ -769,5 +769,5 @@ and QLMeshData (meshPath : string) =
     override this.GetPreviewItem (_, index) =
         let url = NSUrl.FromFilename meshPath
         let item = new ARKit.ARQuickLookPreviewItem(url)
-        item.AllowsContentScaling <- false
+        item.AllowsContentScaling <- true
         upcast item

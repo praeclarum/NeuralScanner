@@ -119,10 +119,11 @@ module SceneKitGeometry =
                     elemWriter.Write (c.X)
                     elemWriter.Write (c.Y)
                     elemWriter.Write (c.Z)
+                    elemWriter.Write (1.0f)
                 elemWriter.Flush ()
                 elemStream.Position <- 0L
                 let data = NSData.FromStream (elemStream)
-                SCNGeometrySource.FromData(data, SCNGeometrySourceSemantics.Color, nint mesh.Colors.Length, true, nint 3, nint 4, nint 0, nint (3*4))
+                SCNGeometrySource.FromData(data, SCNGeometrySourceSemantics.Color, nint mesh.Colors.Length, true, nint 4, nint 4, nint 0, nint (4*4))
             let element =
                 let elemStream = new IO.MemoryStream ()
                 let elemWriter = new IO.BinaryWriter (elemStream)

@@ -69,7 +69,7 @@ type Project (settings : ProjectSettings, projectDir : string) =
         path
 
     member this.SaveSolidMeshAsUsdz (mesh : SdfKit.Mesh, meshId : string) : string =
-        let upath = Path.Combine (projectDir, sprintf "%s_SolidMesh_%s.usd" this.ExportFileName meshId)
+        let upath = Path.Combine (projectDir, sprintf "%s_SolidMesh_%s.usdc" this.ExportFileName meshId)
         let zpath = Path.ChangeExtension (upath, ".usdz")
         let uurl = Foundation.NSUrl.FromFilename upath
 
@@ -77,7 +77,7 @@ type Project (settings : ProjectSettings, projectDir : string) =
         let mmin = mesh.Min
         let mmax = mesh.Max
         let mcenter = (mmin + mmax) * 0.5f
-        let scale = 1.0f
+        let scale = 100.0f
         let transform =
             Matrix4x4.CreateTranslation(-mcenter.X, -mmin.Y, -mcenter.Z) *
             Matrix4x4.CreateScale(scale, scale, scale)
@@ -86,7 +86,6 @@ type Project (settings : ProjectSettings, projectDir : string) =
         let smax = mesh.Max
 
         let node = SceneKitGeometry.createSolidMeshNode mesh
-        let scene = SCNScene.Create ()
         let mmesh = ModelIO.MDLMesh.FromGeometry(node.Geometry)
         let asset = new ModelIO.MDLAsset ()
         asset.UpAxis <- OpenTK.NVector3(0.0f, 1.0f, 0.0f)
@@ -101,7 +100,7 @@ type Project (settings : ProjectSettings, projectDir : string) =
                 let ename =
                     let n = Path.GetFileNameWithoutExtension(upath)
                     let n = if n.Length > 8 then n.Substring(0, 8) else n
-                    n + ".usd"
+                    n + ".usdc"
                 ff.BeginUpdate ()
                 let entry =  ff.EntryFactory.MakeFileEntry(upath, ename, true)
                 entry.CompressionMethod <- ICSharpCode.SharpZipLib.Zip.CompressionMethod.Stored
