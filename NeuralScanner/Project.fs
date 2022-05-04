@@ -70,15 +70,31 @@ type Project (settings : ProjectSettings, projectDir : string) =
 
     member this.SaveSolidMeshAsUsdz (mesh : SdfKit.Mesh, meshId : string) : string =
         let upath = Path.Combine (projectDir, sprintf "%s_SolidMesh_%s.usd" this.ExportFileName meshId)
+        let zpath = Path.ChangeExtension (upath, ".usdz")
         let uurl = Foundation.NSUrl.FromFilename upath
+
+        let mesh = SdfKit.Mesh(mesh.Vertices |> Array.copy, mesh.Colors, mesh.Normals |> Array.copy, mesh.Triangles)
+        let mmin = mesh.Min
+        let mmax = mesh.Max
+        let mcenter = (mmin + mmax) * 0.5f
+        let scale = 1.0f
+        let transform =
+            Matrix4x4.CreateTranslation(-mcenter.X, -mmin.Y, -mcenter.Z) *
+            Matrix4x4.CreateScale(scale, scale, scale)
+        mesh.Transform transform
+        let smin = mesh.Min
+        let smax = mesh.Max
+
         let node = SceneKitGeometry.createSolidMeshNode mesh
         let scene = SCNScene.Create ()
-        scene.RootNode.AddChildNode node
-        let asset = ModelIO.MDLAsset.FromScene scene
+        let mmesh = ModelIO.MDLMesh.FromGeometry(node.Geometry)
+        let asset = new ModelIO.MDLAsset ()
+        asset.UpAxis <- OpenTK.NVector3(0.0f, 1.0f, 0.0f)
+        asset.AddObject mmesh
+        let bb = asset.BoundingBox
         match asset.ExportAssetToUrl(uurl) with
         | false, e -> raise (new Foundation.NSErrorException (e))
         | true, _ ->
-            let zpath = Path.ChangeExtension (upath, ".usdz")
             if IO.File.Exists(zpath) then IO.File.Delete(zpath)
             do
                 let ff = ICSharpCode.SharpZipLib.Zip.ZipFile.Create(zpath)

@@ -57,6 +57,10 @@ type ProjectViewController (project : Project) =
     do
         exportMeshButton.TranslatesAutoresizingMaskIntoConstraints <- false
         exportMeshButton.SetImage(UIImage.GetSystemImage "square.and.arrow.up", UIControlState.Normal)
+    let arMeshButton = UIButton.FromType(UIButtonType.RoundedRect)
+    do
+        arMeshButton.TranslatesAutoresizingMaskIntoConstraints <- false
+        arMeshButton.SetImage(UIImage.GetSystemImage "eye.fill", UIControlState.Normal)
     let previewButton = UIButton.FromType(UIButtonType.RoundedRect)
     do
         previewButton.TranslatesAutoresizingMaskIntoConstraints <- false
@@ -233,6 +237,7 @@ type ProjectViewController (project : Project) =
         view.AddSubview viewButtons
         view.AddSubview scansButton
         view.AddSubview exportMeshButton
+        view.AddSubview arMeshButton
 
         [|
             nameField.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
@@ -267,6 +272,8 @@ type ProjectViewController (project : Project) =
             scansButton.LayoutBaseline == viewPointsButton.LayoutBaseline
             exportMeshButton.LayoutCenterX == scansButton.LayoutCenterX
             exportMeshButton.LayoutBaseline == viewSolidMeshButton.LayoutBaseline
+            arMeshButton.LayoutRight == exportMeshButton.LayoutLeft - 11
+            arMeshButton.LayoutBaseline == viewSolidMeshButton.LayoutBaseline
         |]
 
     override this.UpdateUI () =
@@ -348,6 +355,7 @@ type ProjectViewController (project : Project) =
             | None -> viewSolidMeshButton.Enabled <- false
             | Some x -> x.Hidden <- true; viewSolidMeshButton.Enabled <- true
         exportMeshButton.Enabled <- viewingMeshPath.IsSome
+        arMeshButton.Enabled <- viewingMeshPath.IsSome
 
         if visibleTypes.HasFlag (ViewObjectType.RoughMesh) then
             viewRoughMeshButton.Selected <- true
@@ -414,6 +422,7 @@ type ProjectViewController (project : Project) =
 
             scansButton.TouchUpInside.Subscribe (fun _ -> this.ShowFrames ())
             exportMeshButton.TouchUpInside.Subscribe (fun _ -> this.ExportSolidMesh ())
+            arMeshButton.TouchUpInside.Subscribe (fun _ -> this.ARSolidMesh ())
             viewPointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.DepthPoints))
             viewInsidePointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.InsidePoints))
             viewOutsidePointsButton.TouchUpInside.Subscribe (fun _ -> this.ToggleVisible (ViewObjectType.OutsidePoints))
@@ -637,6 +646,14 @@ type ProjectViewController (project : Project) =
                 ()
             this.PresentPopover (vc, exportMeshButton)
 
+    member this.ARSolidMesh () =
+        match viewingMeshPath with
+        | None -> ()
+        | Some path ->
+            let vc = new QuickLook.QLPreviewController()
+            vc.DataSource <- new QLMeshData(path)
+            this.PresentViewController(vc, true, null)
+
     override this.TouchesBegan (touchSet, e) =
         let touches = touchSet.ToArray<UITouch> ()
         let hitOptions = SCNHitTestOptions(SearchMode = SCNHitTestSearchMode.All,
@@ -742,3 +759,15 @@ and TouchState =
     | NotTouching
     | SingleTouchOnBounds
     | SingleTouchOnBoundsHandle of HandleIndex : int
+
+
+and QLMeshData (meshPath : string) =
+    inherit QuickLook.QLPreviewControllerDataSource ()
+
+    override this.PreviewItemCount (_) = nint 1
+
+    override this.GetPreviewItem (_, index) =
+        let url = NSUrl.FromFilename meshPath
+        let item = new ARKit.ARQuickLookPreviewItem(url)
+        item.AllowsContentScaling <- false
+        upcast item
