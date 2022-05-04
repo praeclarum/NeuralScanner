@@ -68,17 +68,32 @@ type Project (settings : ProjectSettings, projectDir : string) =
         File.Move (tpath, path)
         path
 
-    member this.SaveSolidMeshAsUsd (mesh : SdfKit.Mesh, meshId : string) : string =
-        let path = Path.Combine (projectDir, sprintf "%s_SolidMesh_%s.usd" this.ExportFileName meshId)
-        let url = Foundation.NSUrl.FromFilename path
+    member this.SaveSolidMeshAsUsdz (mesh : SdfKit.Mesh, meshId : string) : string =
+        let upath = Path.Combine (projectDir, sprintf "%s_SolidMesh_%s.usd" this.ExportFileName meshId)
+        let uurl = Foundation.NSUrl.FromFilename upath
         let node = SceneKitGeometry.createSolidMeshNode mesh
         let scene = SCNScene.Create ()
         scene.RootNode.AddChildNode node
         let asset = ModelIO.MDLAsset.FromScene scene
-        match asset.ExportAssetToUrl(url) with
+        match asset.ExportAssetToUrl(uurl) with
         | false, e -> raise (new Foundation.NSErrorException (e))
-        | true, _ -> path
-
+        | true, _ ->
+            let zpath = Path.ChangeExtension (upath, ".usdz")
+            if IO.File.Exists(zpath) then IO.File.Delete(zpath)
+            do
+                let ff = ICSharpCode.SharpZipLib.Zip.ZipFile.Create(zpath)
+                let ename =
+                    let n = Path.GetFileNameWithoutExtension(upath)
+                    let n = if n.Length > 8 then n.Substring(0, 8) else n
+                    n + ".usd"
+                ff.BeginUpdate ()
+                let entry =  ff.EntryFactory.MakeFileEntry(upath, ename, true)
+                entry.CompressionMethod <- ICSharpCode.SharpZipLib.Zip.CompressionMethod.Stored
+                let ds = ICSharpCode.SharpZipLib.Zip.StaticDiskDataSource(upath)
+                ff.Add (ds, entry)
+                ff.CommitUpdate()
+                ff.Close ()
+            zpath
     member this.ClipTransform =
         let st = SCNMatrix4.Scale (this.Settings.ClipScale.X, this.Settings.ClipScale.Y, this.Settings.ClipScale.Z)
         let tt = SCNMatrix4.CreateTranslation (this.Settings.ClipTranslation.X, this.Settings.ClipTranslation.Y, this.Settings.ClipTranslation.Z)

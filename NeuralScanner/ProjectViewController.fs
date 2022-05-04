@@ -504,7 +504,7 @@ type ProjectViewController (project : Project) =
                 let voxels = Meshes.generateSolidVoxels trainingService.Model trainingService.Data setProgress
                 let mesh = Meshes.meshFromVoxels voxels
                 if mesh.Triangles.Length > 0 then
-                    let meshPathTask = Threading.Tasks.Task.Run(fun () -> project.SaveSolidMeshAsUsd (mesh, mid)).ContinueWith(fun (t : Threading.Tasks.Task<string>) ->
+                    let meshPathTask = Threading.Tasks.Task.Run(fun () -> project.SaveSolidMeshAsUsdz (mesh, mid)).ContinueWith(fun (t : Threading.Tasks.Task<string>) ->
                         if t.Exception <> null then
                             this.ShowError t.Exception
                         elif t.IsCompletedSuccessfully then
