@@ -296,7 +296,7 @@ type SdfFrame (depthPath : string) =
             minv, maxv
 
     let getRandomFreespaceDepthOffset (depth : float32) (x : int) (y : int) : float32 =        
-        let mutable sampleDepth = depth * (0.9f + 0.09f*float32 (StaticRandom.NextDouble()))
+        let mutable sampleDepth = depth * (0.8f + 0.19f*float32 (StaticRandom.NextDouble()))
         let mutable samplePos = clipPosition x y (sampleDepth - depth)
         let mutable n = 0
         while n < 5 && ((abs samplePos.X) > 0.999f || (abs samplePos.Y) > 0.999f || abs samplePos.Z > 0.999f) do

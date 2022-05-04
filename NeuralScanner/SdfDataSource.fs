@@ -168,14 +168,12 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
                 let n = 1
                 for i in 1..n do
                     printfn "REG START PASS %d/%d" i n
-                    registerFramesOpenGR frames i
+                    registerFramesNew frames i
                     printfn "REG END PASS %d/%d" i n
                 printfn "REG COMPLETE")
         else
             Threading.Tasks.Task.CompletedTask
 
-    //let registerFramesTask = registerFramesAsync ()
-    //member this.WaitForRegistration () = registerFramesTask.Wait()
 
     //let testOpenGR() =
     //    let staticPoints =
@@ -193,6 +191,8 @@ type SdfDataSet (project : Project, samplingDistance : float32, outputScale : fl
     //    ()
     //do testOpenGR ()
 
+    //let registerFramesTask = registerFramesAsync ()
+    //member this.WaitForRegistration () = registerFramesTask.Wait()
     member this.WaitForRegistration () = ()
 
     member this.Project = project
