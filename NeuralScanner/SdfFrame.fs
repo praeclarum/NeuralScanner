@@ -318,6 +318,13 @@ type SdfFrame (depthPath : string) =
         let clipZ = getRandomCellPoint clipIndex.Z numOccCells
         Vector3 (clipX, clipY, clipZ)
 
+    let surfacePoint = Tensor.Constant(0.0f)
+    let freePoint = Tensor.Constant(1.0f)
+    let outputWeights = Tensor.Array(0.1f, 0.1f, 0.1f, 1.0f)
+    let freeOutputWeights = Tensor.Array(0.0f, 0.0f, 0.0f, 0.0f)
+    let freespaceWeights = Tensor.Array(0.0f, 0.0f, 0.0f, 0.0f)
+    let freeFreespaceWeights = Tensor.Array(0.0f, 0.0f, 0.0f, -1.0f)
+
     member this.Title = title
     override this.ToString () = this.Title
 
@@ -377,7 +384,7 @@ type SdfFrame (depthPath : string) =
         let y = index / width
 
         // Half the time inside, half outside
-        let rawClipPos, outputSignedDistance, free =
+        let rawClipPos, outputSignedDistance, isFree =
             let isFree = not inside && (StaticRandom.Next (2) = 1)
             let useUnoccupied = false // isFree && (StaticRandom.Next (100) < 50)
             if useUnoccupied then
@@ -385,27 +392,27 @@ type SdfFrame (depthPath : string) =
                 let wpos = Vector4.Transform (cp, clipToWorldTransform)
                 let swpos = SCNVector3 (wpos.X, wpos.Y, wpos.Z)
                 batchData.FreespacePoints.Add swpos
-                cp, 0.1f * outputScale, 1.0f
+                cp, 0.1f * outputScale, true
             else
-                let depthOffset, free =
+                let depthOffset, isFree =
                     if inside then
                         // Inside Surface
-                        abs (randn () * samplingDistance), 0.0f
+                        abs (randn () * samplingDistance), false
                     else
                         // Outside
                         if not isFree then
                             // Ouside Surface
-                            -abs (randn () * samplingDistance), 0.0f
+                            -abs (randn () * samplingDistance), false
                         else
                             // Freespace
                             let depth = depths.[index]
-                            getRandomFreespaceDepthOffset depth x y, 1.0f
+                            getRandomFreespaceDepthOffset depth x y, true
 
                 let wpos = worldPosition x y depthOffset
                 let swpos = SCNVector3 (wpos.X, wpos.Y, wpos.Z)
                 if depthOffset >= 0.0f then
                     batchData.InsideSurfacePoints.Add swpos
-                elif free > 0.5f then
+                elif isFree then
                     batchData.FreespacePoints.Add swpos
                 else
                     batchData.OutsideSurfacePoints.Add swpos
@@ -413,7 +420,7 @@ type SdfFrame (depthPath : string) =
                 //let pos = wpos - Vector4(poi, 1.0f)
                 let clipPos = clipPosition x y depthOffset
                 let outputSignedDistance = -depthOffset * outputScale
-                clipPos, outputSignedDistance, free
+                clipPos, outputSignedDistance, isFree
 
         let mutable clipPos = rawClipPos
         clipPos.X <- Math.Clamp(clipPos.X, -1.0f, 1.0f)
@@ -423,9 +430,10 @@ type SdfFrame (depthPath : string) =
         let color = getColor x y
 
         let inputs = [| PositionEncoding.encodePosition frameIndex numFrames numPositionEncodings clipPos
-                        Tensor.Constant (free, freespaceShape)
-                        Tensor.Array (0.0f, 0.0f, 0.0f, -free)
-                        Tensor.Array (color.X, color.Y, color.Z, outputSignedDistance) |]
+                        //if isFree then freeOutputWeights else outputWeights
+                        if isFree then freePoint else surfacePoint
+                        if isFree then freeFreespaceWeights else freespaceWeights
+                        Tensor.Array (2.0f*color.X-1.0f, 2.0f*color.Y-1.0f, 2.0f*color.Z-1.0f, outputSignedDistance) |]
         struct (inputs, [| |])
 
     member this.GetPointGeometry () = pointGeometry.Value

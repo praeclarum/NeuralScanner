@@ -56,7 +56,7 @@ let generateSolidVoxels (model : Model) (data : SdfDataSet) (progress : float32 
             for i in 0..(nin-1) do
                 let r = results.[i].[0]
                 r.CopyTo(res.AsSpan())
-                let yvec = Vector4(res.[0], res.[1], res.[2], res.[3])
+                let yvec = Vector4(res.[0]*0.5f + 0.5f, res.[1]*0.5f + 0.5f, res.[2]*0.5f + 0.5f, res.[3])
                 //if numPoints < totalPoints / 100 then
                 //    printfn "%g" yvec.W
                 yspan.[batchOutputs.[i]] <- yvec
