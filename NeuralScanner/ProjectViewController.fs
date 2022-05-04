@@ -371,6 +371,7 @@ type ProjectViewController (project : Project) =
             trainingService.Changed.Subscribe (fun _ ->
                 this.BeginInvokeOnMainThread (fun _ ->
                     this.UpdateUI ()))
+            trainingService.Error.Subscribe this.ShowError
             trainingService.BatchTrained.Subscribe (fun (batchSize, numPointsPerEpoch, loss, batchData) ->
                 this.HandleBatchData batchData
                 this.BeginInvokeOnMainThread (fun _ ->

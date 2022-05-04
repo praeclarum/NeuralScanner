@@ -35,8 +35,10 @@ type TrainingService (project : Project) =
 
     let mutable training : Threading.CancellationTokenSource option = None
 
+    let errorEv = Event<exn> ()
+
     let reportError (e : exn) =
-        printfn "ERROR: %O" e
+        errorEv.Trigger e
 
     let createInput () =
         Tensor.Input("pos_enc", 3 + 6 * numPositionEncodings)
@@ -54,8 +56,8 @@ type TrainingService (project : Project) =
         let houtput =
             (seq{networkDepth/2..(networkDepth-1)}
              |> Seq.fold hiddenLayer inner)
-        let output = houtput.Dense(1, weightsInit=weightsInit, name="raw_distance")
-        let output = if useTanh then output.Tanh ("distance") else output
+        let output = houtput.Dense(4, weightsInit=weightsInit, name="rgbd")
+        let output = if useTanh then output.Tanh ("tan_rgbd") else output
         let model = Model (input, output, "SDF")
         //let r = model.Compile (Loss.MeanAbsoluteError,
         //                       new AdamOptimizer(learningRate))
@@ -67,16 +69,17 @@ type TrainingService (project : Project) =
     let createTrainingModel (sdfModel : Model) : Model =
         let inputXyz = createInput ()
         let inputFreespace = Tensor.Input("freespace", 1)
-        let inputExpected = Tensor.Input("distance", 1)
+        let inputFreespaceMask = Tensor.Input("freespaceMask", 4)
+        let inputExpected = Tensor.Input("rgbd", 4)
         let output = sdfModel.Call(inputXyz)
-        let model = Model ([|inputXyz; inputFreespace; inputExpected|], [|output|], "TrainSDF")
+        let model = Model ([|inputXyz; inputFreespace; inputFreespaceMask; inputExpected|], [|output|], "TrainSDF")
 
         let clipOutput = output.Clip(-lossClipDelta, lossClipDelta)
         let clipExpected = inputExpected.Clip(-lossClipDelta, lossClipDelta)
 
         let surfaceLoss = clipOutput.Loss(clipExpected, Loss.MeanAbsoluteError)
 
-        let freespaceLoss = (0.0f - clipOutput).Clip(0.0f, lossClipDelta)
+        let freespaceLoss = (clipOutput * inputFreespaceMask).Clip(0.0f, lossClipDelta).Loss(Tensor.Zeros(4), Loss.Builtin(LossType.MeanAbsoluteError, ReductionType.Sum))
 
         let totalLoss = surfaceLoss * (1.0f - inputFreespace) + freespaceLoss * inputFreespace
 
@@ -137,6 +140,8 @@ type TrainingService (project : Project) =
     member this.BatchTrained = batchTrained.Publish
 
     member this.Changed = changed.Publish
+
+    member this.Error = errorEv.Publish
 
     member this.IsTraining = training.IsSome
 

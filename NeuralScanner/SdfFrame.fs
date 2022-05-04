@@ -235,9 +235,8 @@ type SdfFrame (depthPath : string) =
 
     //do printfn "FRAME %s center=%A" (IO.Path.GetFileName(depthPath)) (worldPosition (width/2) (height/2) 0.0f)
 
-    static let vector4Shape = [| 4 |]
     static let freespaceShape = [| 1 |]
-    static let distanceShape = [| 1 |]
+    static let rgbdShape = [| 4 |]
 
     let mutable inboundIndices = [||]
 
@@ -421,9 +420,12 @@ type SdfFrame (depthPath : string) =
         clipPos.Y <- Math.Clamp(clipPos.Y, -1.0f, 1.0f)
         clipPos.Z <- Math.Clamp(clipPos.Z, -1.0f, 1.0f)
 
+        let color = getColor x y
+
         let inputs = [| PositionEncoding.encodePosition frameIndex numFrames numPositionEncodings clipPos
                         Tensor.Constant (free, freespaceShape)
-                        Tensor.Constant (outputSignedDistance, distanceShape) |]
+                        Tensor.Array (0.0f, 0.0f, 0.0f, -free)
+                        Tensor.Array (color.X, color.Y, color.Z, outputSignedDistance) |]
         struct (inputs, [| |])
 
     member this.GetPointGeometry () = pointGeometry.Value

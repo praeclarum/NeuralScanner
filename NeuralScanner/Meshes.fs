@@ -52,9 +52,11 @@ let generateSolidVoxels (model : Model) (data : SdfDataSet) (progress : float32 
             for i in 0..(nbatch - 1) do
                 tpool.Return batchTensors.[i]
             //tapool.Return batchTensors
+            let res : float32[] = Array.zeroCreate 4
             for i in 0..(nin-1) do
                 let r = results.[i].[0]
-                let yvec = Vector4(1.0f, 1.0f, 1.0f, r.[0])
+                r.CopyTo(res.AsSpan())
+                let yvec = Vector4(res.[0], res.[1], res.[2], res.[3])
                 //if numPoints < totalPoints / 100 then
                 //    printfn "%g" yvec.W
                 yspan.[batchOutputs.[i]] <- yvec
