@@ -53,7 +53,7 @@ type Project (settings : ProjectSettings, projectDir : string) =
                      and set v = this.Settings.Name <- v; this.SetModified "Name"
     member this.ExportFileName =
         let n = this.Name.Trim ()
-        if n.Length > 0 then n
+        if n.Length > 0 then n.Replace("*", "_").Replace("?", "_").Replace("!", "_").Replace("/", "_")
         else "Untitled"
 
     member this.NumCaptures = captureFiles.Length
@@ -67,6 +67,17 @@ type Project (settings : ProjectSettings, projectDir : string) =
             File.Delete path
         File.Move (tpath, path)
         path
+
+    member this.SaveSolidMeshAsUsd (mesh : SdfKit.Mesh, meshId : string) : string =
+        let path = Path.Combine (projectDir, sprintf "%s_SolidMesh_%s.usd" this.ExportFileName meshId)
+        let url = Foundation.NSUrl.FromFilename path
+        let node = SceneKitGeometry.createSolidMeshNode mesh
+        let scene = SCNScene.Create ()
+        scene.RootNode.AddChildNode node
+        let asset = ModelIO.MDLAsset.FromScene scene
+        match asset.ExportAssetToUrl(url) with
+        | false, e -> raise (new Foundation.NSErrorException (e))
+        | true, _ -> path
 
     member this.ClipTransform =
         let st = SCNMatrix4.Scale (this.Settings.ClipScale.X, this.Settings.ClipScale.Y, this.Settings.ClipScale.Z)
