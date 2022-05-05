@@ -104,17 +104,14 @@ type Project (settings : ProjectSettings, projectDir : string) =
         let smin = mesh.Min
         let smax = mesh.Max
 
-        let submeshes = SceneKitGeometry.getMeshComponents mesh
-
         let asset = new ModelIO.MDLAsset ()
         asset.UpAxis <- OpenTK.NVector3(0.0f, 1.0f, 0.0f)
-        submeshes |> Seq.iter (fun mesh -> 
-            let node = SceneKitGeometry.createSolidMeshNode submeshes.[0]
-            let mmesh = ModelIO.MDLMesh.FromGeometry(node.Geometry)
-            //mmesh.AddAttribute(string ModelIO.MDLVertexAttributes.TextureCoordinate, ModelIO.MDLVertexFormat.Float2)
-            //mmesh.AddUnwrappedTextureCoordinates (string ModelIO.MDLVertexAttributes.TextureCoordinate)
-            mmesh.Name <- this.Name
-            asset.AddObject mmesh)
+        let node = SceneKitGeometry.createSolidMeshNode mesh
+        let mmesh = ModelIO.MDLMesh.FromGeometry(node.Geometry)
+        //mmesh.AddAttribute(string ModelIO.MDLVertexAttributes.TextureCoordinate, ModelIO.MDLVertexFormat.Float2)
+        //mmesh.AddUnwrappedTextureCoordinates (string ModelIO.MDLVertexAttributes.TextureCoordinate)
+        mmesh.Name <- this.Name
+        asset.AddObject mmesh
         let bb = asset.BoundingBox
         match asset.ExportAssetToUrl(uurl) with
         | false, e -> raise (new Foundation.NSErrorException (e))
