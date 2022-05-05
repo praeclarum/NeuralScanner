@@ -41,6 +41,24 @@ type AxisOccupancy =
             this.XAxis.[yi, zi] <- true
             this.YAxis.[zi, xi] <- true
             this.ZAxis.[xi, yi] <- true
+            if xi-1 >= 0 then
+                this.YAxis.[zi, xi-1] <- true
+                this.ZAxis.[xi-1, yi] <- true
+            if xi+1 < n then
+                this.YAxis.[zi, xi+1] <- true
+                this.ZAxis.[xi+1, yi] <- true
+            if yi-1 >= 0 then
+                this.XAxis.[yi-1, zi] <- true
+                this.ZAxis.[xi, yi-1] <- true
+            if yi+1 < n then
+                this.XAxis.[yi+1, zi] <- true
+                this.ZAxis.[xi, yi+1] <- true
+            if zi-1 >= 0 then
+                this.XAxis.[yi, zi-1] <- true
+                this.YAxis.[zi-1, xi] <- true
+            if zi+1 < n then
+                this.XAxis.[yi, zi+1] <- true
+                this.YAxis.[zi+1, xi] <- true
     member this.IsOccupied (clipX : float32, clipY : float32, clipZ : float32) =
         let n = this.NumCells
         let s = float32 n / 2.0f
