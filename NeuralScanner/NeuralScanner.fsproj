@@ -111,6 +111,7 @@
     <ImageAsset Include="Assets.xcassets\AppIcon.appiconset\Icon180.png" />
     <ImageAsset Include="Assets.xcassets\AppIcon.appiconset\Icon167.png" />
     <ImageAsset Include="Assets.xcassets\AppIcon.appiconset\Icon120.png" />
+    <ImageAsset Include="Assets.xcassets\AppIcon.appiconset\Icon1024.png" />
     <ImageAsset Include="Assets.xcassets\Contents.json" />
     <InterfaceDefinition Include="LaunchScreen.storyboard" />
     <None Include="Info.plist" />
