@@ -93,7 +93,6 @@ type Project (settings : ProjectSettings, projectDir : string) =
                     goodTris.Add c
         printfn "TRIS NEW: %d OLD: %d" goodTris.Count mesh.Triangles.Length
         let mesh = SdfKit.Mesh(mesh.Vertices |> Array.copy, mesh.Colors, mesh.Normals |> Array.copy, goodTris.ToArray ())
-        let submeshes = SceneKitGeometry.getMeshComponents mesh
         let mmin = mesh.Min
         let mmax = mesh.Max
         let mcenter = (mmin + mmax) * 0.5f
@@ -105,17 +104,17 @@ type Project (settings : ProjectSettings, projectDir : string) =
         let smin = mesh.Min
         let smax = mesh.Max
 
-        let node = SceneKitGeometry.createSolidMeshNode mesh
-        let mmesh = ModelIO.MDLMesh.FromGeometry(node.Geometry)
-        //mmesh.AddAttribute(string ModelIO.MDLVertexAttributes.TextureCoordinate, ModelIO.MDLVertexFormat.Float2)
-        mmesh.Name <- this.Name
-        printfn "OLD VERTS: %O" mmesh.VertexCount
-        mmesh.MakeVerticesUnique ()
-        printfn "NEW VERTS: %O" mmesh.VertexCount
-        mmesh.AddUnwrappedTextureCoordinates (string ModelIO.MDLVertexAttributes.TextureCoordinate)
+        let submeshes = SceneKitGeometry.getMeshComponents mesh
+
         let asset = new ModelIO.MDLAsset ()
         asset.UpAxis <- OpenTK.NVector3(0.0f, 1.0f, 0.0f)
-        asset.AddObject mmesh
+        submeshes |> Seq.iter (fun mesh -> 
+            let node = SceneKitGeometry.createSolidMeshNode submeshes.[0]
+            let mmesh = ModelIO.MDLMesh.FromGeometry(node.Geometry)
+            //mmesh.AddAttribute(string ModelIO.MDLVertexAttributes.TextureCoordinate, ModelIO.MDLVertexFormat.Float2)
+            //mmesh.AddUnwrappedTextureCoordinates (string ModelIO.MDLVertexAttributes.TextureCoordinate)
+            mmesh.Name <- this.Name
+            asset.AddObject mmesh)
         let bb = asset.BoundingBox
         match asset.ExportAssetToUrl(uurl) with
         | false, e -> raise (new Foundation.NSErrorException (e))

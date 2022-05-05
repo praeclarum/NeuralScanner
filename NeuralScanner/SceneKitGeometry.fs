@@ -120,6 +120,29 @@ module SceneKitGeometry =
         let meshes = ResizeArray<_> ()
         let subTris = ResizeArray<int> ()
         let addMesh () =
+            // Build new triangles
+            let newTris = Array.zeroCreate (subTris.Count * 3)
+            let newVerts = ResizeArray<Vector3> (subTris.Count * 3)
+            let newVertIndex = Collections.Generic.Dictionary<int, int> ()
+            let newColors = ResizeArray<Vector3> (subTris.Count * 3)
+            let newNorms = ResizeArray<Vector3> (subTris.Count * 3)
+            for nti in 0..(subTris.Count-1) do
+                let oti = subTris.[nti]
+                for j in 0..2 do
+                    // Renumber the vertices
+                    let ovi = mesh.Triangles.[oti*3 + j]
+                    let nvi =
+                        match newVertIndex.TryGetValue ovi with
+                        | true, x -> x
+                        | _ ->
+                            let x = newVerts.Count
+                            newVerts.Add(mesh.Vertices.[ovi])
+                            newColors.Add(mesh.Colors.[ovi])
+                            newNorms.Add(mesh.Normals.[ovi])
+                            newVertIndex.Add(ovi, x)
+                            x
+                    newTris.[nti*3 + j] <- nvi
+            meshes.Add(new SdfKit.Mesh(newVerts.ToArray (), newColors.ToArray (), newNorms.ToArray (), newTris))
             subTris.Clear ()
             queueTris.Clear ()
             ()
@@ -137,7 +160,7 @@ module SceneKitGeometry =
                                 queueTris.Enqueue sti)
                         ()
             addMesh ()
-        meshes.ToArray ()
+        meshes |> Seq.sortByDescending (fun x -> x.Triangles.Length) |> Array.ofSeq
 
     let createSolidMeshNode (mesh : SdfKit.Mesh) : SCNNode =
         if mesh.Vertices.Length > 0 && mesh.Triangles.Length > 0 then
