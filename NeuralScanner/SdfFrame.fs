@@ -305,6 +305,8 @@ type SdfFrame (depthPath : string) =
 
     let mutable inboundIndices = [||]
 
+    let goodIndex (normals:Vector3[]) i = confidences.[i] >= minConfidence && normals.[i].LengthSquared() > 0.1f
+
     let pointGeometry =
         lazy
             let points = ResizeArray<SceneKit.SCNVector3>()
@@ -315,7 +317,7 @@ type SdfFrame (depthPath : string) =
                 for y in 0..(height-1) do
                     let i = index x y
                     let ci = colorIndex x y
-                    if confidences.[i] >= minConfidence && normals.[i].LengthSquared() > 0.1f then
+                    if goodIndex normals i then
                         let p = cameraPosition x y 0.0f
                         points.Add (SceneKit.SCNVector3 (p.X, p.Y, p.Z))
                         colors.Add (getColor x y)
@@ -414,27 +416,16 @@ type SdfFrame (depthPath : string) =
     member this.Visible with get () = config.Visible
                         and set v = config.Visible <- v; saveConfig ()
 
-    member this.FindInBoundPoints (min : Vector3, max : Vector3) =
-        let inbounds = ResizeArray<_>()
-        for x in 0..(width-1) do
-            for y in 0..(height-1) do
-                let i = index x y
-                if confidences.[i] >= minConfidence then
-                    let p = worldPosition x y 0.0f
-                    if p.X >= min.X && p.Y >= min.Y && p.Z >= min.Z &&
-                       p.X <= max.X && p.Y <= max.Y && p.Z <= max.Z then
-                        inbounds.Add(i)
-        inboundIndices <- inbounds.ToArray ()
-
     member this.SetClip (newWorldToClipTransform : Matrix4x4, newClipToWorldTransform : Matrix4x4, occupancy : AxisOccupancy) =
         clipToWorldTransform <- newClipToWorldTransform
         worldToClipTransform <- newWorldToClipTransform
         camToClipTransform <- camToWorldTransform * worldToClipTransform
+        let normals = getNormals ()
         let inbounds = ResizeArray<_>()
         for x in 0..(width-1) do
             for y in 0..(height-1) do
                 let i = index x y
-                if confidences.[i] >= minConfidence then
+                if goodIndex normals i then
                     let p = clipPosition x y 0.0f
                     if p.X >= -1.0f && p.Y >= -1.0f && p.Z >= -1.0f &&
                        p.X <= 1.0f && p.Y <= 1.0f && p.Z <= 1.0f then
