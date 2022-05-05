@@ -138,7 +138,9 @@ type SdfFrame (depthPath : string) =
         assert(n = dataSize)
         r.Close()
         width, height, depths
+    let index x y = y * width + x
 
+    let minConfidence = 2uy
     let confidences =
         let path = depthPath.Replace("_Depth", "_DepthConfidence")
         let f = File.OpenRead (path)
@@ -169,8 +171,7 @@ type SdfFrame (depthPath : string) =
             bc.Dispose()
             cs.Dispose()
         bytes
-
-    let pointCount = depths.Length
+    let colorIndex x y = y * (width * 4) + (x * 4)
 
     let loadMatrix (path : string) =
         let rows =
@@ -199,7 +200,7 @@ type SdfFrame (depthPath : string) =
         m.M13 <- m.M13 * iscale
         m.M23 <- m.M23 * iscale
         m
-    let projection = loadMatrix (filePath "Projection.txt")
+    //let projection = loadMatrix (filePath "Projection.txt")
 
     let mutable camToWorldTransform =
         let m = loadMatrix (filePath "Transform.txt")
@@ -209,8 +210,6 @@ type SdfFrame (depthPath : string) =
     let mutable clipToWorldTransform = Matrix4x4.Identity
     let mutable worldToClipTransform = Matrix4x4.Identity
 
-    let index x y = y * width + x
-    let colorIndex x y = y * (width * 4) + (x * 4)
 
     let cameraPosition (x : int) (y : int) depthOffset : Vector3 =
         let depth = -(depths.[index x y] + depthOffset)
@@ -235,28 +234,96 @@ type SdfFrame (depthPath : string) =
 
     //do printfn "FRAME %s center=%A" (IO.Path.GetFileName(depthPath)) (worldPosition (width/2) (height/2) 0.0f)
 
-    static let freespaceShape = [| 1 |]
-    static let rgbdShape = [| 4 |]
+    let normals : Vector3[] = Array.zeroCreate (width*height)
+
+    let confident x y = confidences.[index x y] >= minConfidence
+
+    let updateNormals () =
+        // Precalc positions
+        let pos : Vector3[] = Array.zeroCreate (width*height)
+        for x in 0..(width-1) do
+            for y in 0..(height-1) do
+                if confident x y then
+                    pos.[index x y] <- worldPosition x y 0.0f
+        // Calc normals
+        //let camPos = camToWorldTransform.Translation
+        let maxDist = 0.1f
+        for x in 0..(width-1) do
+            for y in 0..(height-1) do
+                let i = index x y
+                if confidences.[i] >= minConfidence then
+                    let d = depths.[i]
+                    let mutable num = 0
+                    let mutable sum = Vector3.Zero
+                    if x+1 < width && y-1 >= 0 && confident (x+1) y && confident x (y-1) then
+                        let i0 = index (x+1) y
+                        let i1 = index x (y-1)
+                        let d0 = depths.[i0]
+                        let d1 = depths.[i1]
+                        if abs (d0 - d) < maxDist && abs(d1 - d) < maxDist then
+                            let e0 = Vector3.Normalize(pos.[i0] - pos.[i])
+                            let e1 = Vector3.Normalize(pos.[i1] - pos.[i])
+                            let n = Vector3.Cross (e0, e1)
+                            sum <- sum + n
+                            num <- num + 1
+                        else
+                            // Reject: too far
+                            //printfn "REJECT %g %g" (d0-d) (d1-d)
+                            ()
+                    if x-1 >= 0 && y+1 < height && confident (x-1) y && confident x (y+1) then
+                        let i0 = index (x-1) y
+                        let i1 = index x (y+1)
+                        let d0 = depths.[i0]
+                        let d1 = depths.[i1]
+                        if abs (d0 - d) < maxDist && abs(d1 - d) < maxDist then
+                            let e0 = Vector3.Normalize(pos.[i0] - pos.[i])
+                            let e1 = Vector3.Normalize(pos.[i1] - pos.[i])
+                            let n = Vector3.Cross (e0, e1)
+                            sum <- sum + n
+                            num <- num + 1
+                        else
+                            // Reject: too far
+                            //printfn "REJECT %g %g" (d0-d) (d1-d)
+                            ()
+                    if num > 0 then
+                        let n = Vector3.Normalize (sum / float32 num)
+                        normals.[i] <- n
+                        //let camN = Vector3.Normalize (camPos - pos.[i])
+                        //if Vector3.Dot (n, camN) >= 0.0f then
+                        //    normals.[i] <- n
+                        //else
+                        //    normals.[i] <- -n
+                    else
+                        normals.[i] <- Vector3.Zero
+
+    let mutable normalsNeedUpdate = true
+    let getNormals () =
+        if normalsNeedUpdate then
+            normalsNeedUpdate <- false
+            updateNormals ()
+        normals
 
     let mutable inboundIndices = [||]
-
-    let minConfidence = 2uy
 
     let pointGeometry =
         lazy
             let points = ResizeArray<SceneKit.SCNVector3>()
             let colors = ResizeArray<Vector3>()
+            let norms = ResizeArray<Vector3>()
+            let normals = getNormals ()
             for x in 0..(width-1) do
                 for y in 0..(height-1) do
                     let i = index x y
                     let ci = colorIndex x y
-                    if confidences.[i] >= minConfidence then
+                    if confidences.[i] >= minConfidence && normals.[i].LengthSquared() > 0.1f then
                         let p = cameraPosition x y 0.0f
                         points.Add (SceneKit.SCNVector3 (p.X, p.Y, p.Z))
                         colors.Add (getColor x y)
+                        //colors.Add (Vector3.Abs(normals.[i]))
+                        norms.Add (normals.[i])
             let pointCoords = points.ToArray ()
             //SceneKitGeometry.createPointCloudGeometry UIColor.White pointCoords
-            SceneKitGeometry.createColoredPointCloudGeometry (colors.ToArray()) pointCoords
+            SceneKitGeometry.createColoredPointCloudGeometry (colors.ToArray()) (norms.ToArray()) pointCoords
 
     let centerPoint =
         lazy
@@ -333,6 +400,8 @@ type SdfFrame (depthPath : string) =
     member this.FrameIndex = frameIndex
 
     member this.DepthPath = depthPath
+
+    member this.Normals = getNormals ()
 
     member this.CameraToWorldTransform = camToWorldTransform
 

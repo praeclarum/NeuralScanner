@@ -63,10 +63,11 @@ module SceneKitGeometry =
         material.Emission.ContentColor <- color
         geometry
 
-    let createColoredPointCloudGeometry (colors : Vector3[]) (pointCoords : SCNVector3[]) : SCNGeometry =
+    let createColoredPointCloudGeometry (colors : Vector3[]) (normals : Vector3[]) (pointCoords : SCNVector3[]) : SCNGeometry =
         if pointCoords.Length = 0 then
             failwithf "No points provided"
         let source = SCNGeometrySource.FromVertices(pointCoords)
+        let nsource = SCNGeometrySource.FromNormals(normals |> Array.map (fun x -> SCNVector3(x.X, x.Y, x.Z)))
         let csource =
             let elemStream = new IO.MemoryStream ()
             let elemWriter = new IO.BinaryWriter (elemStream)
@@ -79,9 +80,9 @@ module SceneKitGeometry =
             elemStream.Position <- 0L
             let data = NSData.FromStream (elemStream)
             SCNGeometrySource.FromData(data, SCNGeometrySourceSemantics.Color, nint colors.Length, true, nint 3, nint 4, nint 0, nint (3*4))
-        let geometry = createPointCloudGeometryWithSources [|source;csource|] pointCoords
+        let geometry = createPointCloudGeometryWithSources [|source;nsource;csource|] pointCoords
         let material = geometry.FirstMaterial
-        material.Diffuse.ContentColor <- UIColor.White
+        //material.Diffuse.ContentColor <- UIColor.White
         material.LightingModelName <- SCNLightingModel.Constant
         geometry
 
@@ -93,11 +94,11 @@ module SceneKitGeometry =
             let n = SCNNode.FromGeometry g
             n
 
-    let createColoredPointCloudNode (colors : Vector3[]) (pointCoords : SCNVector3[]) =
+    let createColoredPointCloudNode (colors : Vector3[]) (normals : Vector3[]) (pointCoords : SCNVector3[]) =
         if pointCoords.Length = 0 then
             SCNNode.Create ()
         else
-            let g = createColoredPointCloudGeometry colors pointCoords
+            let g = createColoredPointCloudGeometry colors normals pointCoords
             let n = SCNNode.FromGeometry g
             n
 

@@ -449,10 +449,10 @@ type ProjectViewController (project : Project) =
         this.UpdateUI ()
 
     member this.UpdatePointCloud () =
-        SCNTransaction.Begin ()
-        SCNTransaction.AnimationDuration <- 1.0
-        for fi in project.DepthPaths do
+        Threading.Tasks.Parallel.ForEach (project.DepthPaths, fun fi ->
             let f = project.GetFrame fi
+            SCNTransaction.Begin ()
+            SCNTransaction.AnimationDuration <- 1.0
             if f.Visible then
                 let node = framePointNodes.GetOrAdd (fi, fun fi ->
                     let n = f.CreatePointNode (null)
@@ -465,7 +465,8 @@ type ProjectViewController (project : Project) =
                 match framePointNodes.TryGetValue fi with
                 | true, n -> n.Hidden <- true
                 | _ -> ()
-        SCNTransaction.Commit ()
+            SCNTransaction.Commit ())
+        |> ignore
 
     member private this.GenerateRoughMesh (k : unit -> unit) =
         let setProgress p =
