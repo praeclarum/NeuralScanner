@@ -101,12 +101,54 @@ module SceneKitGeometry =
             let n = SCNNode.FromGeometry g
             n
 
+    let getMeshComponents (mesh : SdfKit.Mesh) : SdfKit.Mesh[] =
+        let numTris = mesh.Triangles.Length/3
+        let remTris = Collections.Generic.HashSet<_>(seq { 0..(numTris-1) })
+        let queueTris = Collections.Generic.Queue<_>()
+        let vf = Collections.Generic.Dictionary<int, ResizeArray<int>> ()
+        for ti in 0 .. (numTris - 1) do
+            for j in 0..2 do
+                let vi = mesh.Triangles.[ti*3 + j]
+                let vfs =
+                    match vf.TryGetValue(vi) with
+                    | true, x -> x
+                    | _ ->
+                        let x = ResizeArray<int>()
+                        vf.Add(vi, x)
+                        x
+                vfs.Add ti
+        let meshes = ResizeArray<_> ()
+        let subTris = ResizeArray<int> ()
+        let addMesh () =
+            subTris.Clear ()
+            queueTris.Clear ()
+            ()
+        while remTris.Count > 0 do
+            let ti = remTris |> Seq.head
+            queueTris.Enqueue ti
+            while queueTris.Count > 0 do
+                let ti = queueTris.Dequeue ()
+                if remTris.Remove ti then
+                    subTris.Add(ti)
+                    for j in 0..2 do
+                        let vi = mesh.Triangles.[ti*3 + j]
+                        vf.[vi] |> Seq.iter (fun sti ->
+                            if remTris.Contains sti && not (queueTris.Contains sti) then
+                                queueTris.Enqueue sti)
+                        ()
+            addMesh ()
+        meshes.ToArray ()
+
     let createSolidMeshNode (mesh : SdfKit.Mesh) : SCNNode =
         if mesh.Vertices.Length > 0 && mesh.Triangles.Length > 0 then
             let vertsSource =
                 mesh.Vertices
                 |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))
                 |> SCNGeometrySource.FromVertices
+            //let tcSource =
+            //    mesh.Vertices
+            //    |> Array.map (fun v -> CoreGraphics.CGPoint.Empty)
+            //    |> SCNGeometrySource.FromTextureCoordinates
             let normsSource =
                 mesh.Normals
                 |> Array.map (fun v -> SCNVector3(v.X, v.Y, v.Z))

@@ -73,7 +73,27 @@ type Project (settings : ProjectSettings, projectDir : string) =
         let zpath = Path.ChangeExtension (upath, ".usdz")
         let uurl = Foundation.NSUrl.FromFilename upath
 
-        let mesh = SdfKit.Mesh(mesh.Vertices |> Array.copy, mesh.Colors, mesh.Normals |> Array.copy, mesh.Triangles)
+        let goodTris = ResizeArray<int> ()
+        for ti in 0..(mesh.Triangles.Length/3 - 1) do
+            let a = mesh.Triangles.[3*ti+0]
+            let b = mesh.Triangles.[3*ti+1]
+            let c = mesh.Triangles.[3*ti+2]
+            if a = b || b = c || a = c then
+                () // Repeat
+                printfn "REPEAT"
+            else
+                let ba = mesh.Vertices.[b] - mesh.Vertices.[a]
+                let ca = mesh.Vertices.[c] - mesh.Vertices.[a]
+                if ba.Length () < 1e-5f || ca.Length () < 1e-5f then
+                    () // Bad Side
+                    printfn "BAD SIDE: %O %O" ba ca
+                else
+                    goodTris.Add a
+                    goodTris.Add b
+                    goodTris.Add c
+        printfn "TRIS NEW: %d OLD: %d" goodTris.Count mesh.Triangles.Length
+        let mesh = SdfKit.Mesh(mesh.Vertices |> Array.copy, mesh.Colors, mesh.Normals |> Array.copy, goodTris.ToArray ())
+        let submeshes = SceneKitGeometry.getMeshComponents mesh
         let mmin = mesh.Min
         let mmax = mesh.Max
         let mcenter = (mmin + mmax) * 0.5f
@@ -87,6 +107,12 @@ type Project (settings : ProjectSettings, projectDir : string) =
 
         let node = SceneKitGeometry.createSolidMeshNode mesh
         let mmesh = ModelIO.MDLMesh.FromGeometry(node.Geometry)
+        //mmesh.AddAttribute(string ModelIO.MDLVertexAttributes.TextureCoordinate, ModelIO.MDLVertexFormat.Float2)
+        mmesh.Name <- this.Name
+        printfn "OLD VERTS: %O" mmesh.VertexCount
+        mmesh.MakeVerticesUnique ()
+        printfn "NEW VERTS: %O" mmesh.VertexCount
+        mmesh.AddUnwrappedTextureCoordinates (string ModelIO.MDLVertexAttributes.TextureCoordinate)
         let asset = new ModelIO.MDLAsset ()
         asset.UpAxis <- OpenTK.NVector3(0.0f, 1.0f, 0.0f)
         asset.AddObject mmesh
