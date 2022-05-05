@@ -2,23 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleName</key>
-	<string>NeuralScanner</string>
+	<key>CFBundleDisplayName</key>
+	<string>Neural Scanner</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.kruegersystems.neuralscanner</string>
+	<key>CFBundleName</key>
+	<string>NeuralScanner</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
-	<string>1.0</string>
+	<string>10000000</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>MinimumOSVersion</key>
 	<string>13.0</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera is used to capture 3D geometry</string>
 	<key>UIDeviceFamily</key>
 	<array>
 		<integer>1</integer>
 		<integer>2</integer>
 	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -36,9 +42,5 @@
 	</array>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/AppIcon.appiconset</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Camera is used to capture 3D geometry</string>
-	<key>UIFileSharingEnabled</key>
-	<true/>
 </dict>
 </plist>

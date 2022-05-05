@@ -4,6 +4,9 @@ PLATFORM=iPhone
 
 all:
 
+clean:
+	msbuild /t:Clean /p:Configuration=$(CONFIGURATION) /p:Platform=$(PLATFORM) NeuralScanner.sln
+
 restore:
 	msbuild /t:Restore /p:Configuration=$(CONFIGURATION) /p:Platform=$(PLATFORM) NeuralScanner.sln
 
