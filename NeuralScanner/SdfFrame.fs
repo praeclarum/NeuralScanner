@@ -433,7 +433,7 @@ type SdfFrame (depthPath : string) =
 
     member this.CameraToWorldTransform = camToWorldTransform
 
-    member this.CameraToWorldSCNMatrix = camToWorldTransform
+    member this.CameraToWorldSCNMatrix = SceneKitGeometry.matrixToSCNMatrix4 camToWorldTransform
 
     member this.CenterPoint = centerPoint.Value
     member this.MinPoint = fst minMaxPoints.Value

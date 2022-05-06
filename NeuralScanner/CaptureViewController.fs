@@ -208,8 +208,11 @@ type CaptureViewController (project : Project) =
                 let frame = SdfFrame (IO.Path.Combine(outputDir, framePrefix + "_Depth.pixelbuffer"))
                 project.AddFrame frame
                 let n = frame.CreatePointNode (UIColor.SystemGreen)
-                n.Opacity <- nfloat 0.5
+                n.Opacity <- nfloat 0.0
+                n.Transform <- frame.CameraToWorldSCNMatrix
                 SCNTransaction.Begin ()
+                SCNTransaction.AnimationDuration <- 1.0
+                n.Opacity <- nfloat 0.75
                 let root = sceneView.Scene.RootNode
                 root.AddChildNode n
                 SCNTransaction.Commit ()) |> ignore
