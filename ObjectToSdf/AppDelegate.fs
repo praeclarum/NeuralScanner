@@ -43,20 +43,26 @@ type O2S () =
             MeshTransforms.Scale (mesh, scale/cbounds.Extents.x, scale/cbounds.Extents.y, scale/cbounds.Extents.z)
             let sbounds = mesh.GetBounds ()
             let sdf = new MeshSignedDistanceGrid(mesh, cellSize)
+            sdf.ComputeSigns <- true
             sdf.UseParallel <- true
             sdf.Compute()
             let iso = DenseGridTrilinearImplicit(sdf.Grid, Vector3d(sdf.GridOrigin), cellSize)
+            iso.Outside <- 2.0
             let tempPath =
                 let p = Path.GetTempFileName ()
                 use s = new FileStream(p, FileMode.Create, FileAccess.Write)
                 use w = new BinaryWriter (s)
                 for i in 0..(numPoints - 1) do
+                    let wantSurface = (i % 2) = 0
                     let mutable p = Vector3d (random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0)
-                    let d = iso.Value (&p)
+                    let mutable d = iso.Value (&p) |> float32
+                    while Single.IsInfinity d || Single.IsNaN d || (wantSurface && abs d > 0.1f) do
+                        p <- Vector3d (random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0)
+                        d <- iso.Value (&p) |> float32
                     w.Write(float32 p.x)
                     w.Write(float32 p.y)
                     w.Write(float32 p.z)
-                    w.Write(d)
+                    w.Write(float32 d)
                 p
             File.Move (tempPath, outputPath)
 
