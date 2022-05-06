@@ -30,6 +30,7 @@ type CaptureViewController (project : Project) =
     //do arConfig.InitialWorldMap <- initialMap
 
     let mutable needsCapture = false
+    let mutable needsBoundingBox = false
 
     let outputPixelBuffer (prefix : string) (name : string) (buffer : CoreVideo.CVPixelBuffer) : string =
         match buffer.PixelFormatType with
@@ -120,8 +121,15 @@ type CaptureViewController (project : Project) =
                 needsCapture <- true)
         |]
 
+    override this.ViewDidDisappear (a) =
+        base.ViewDidDisappear (a)
+        this.StopUI ()
+
     override this.StopUI () =
         base.StopUI ()
+        if needsBoundingBox then
+            needsBoundingBox <- false
+            project.AutoSetBounds ()
         match sceneView.Session with
         | null -> ()
         | session ->
@@ -204,6 +212,7 @@ type CaptureViewController (project : Project) =
             outputNMatrix4 framePrefix "Projection" cameraProjection
             outputNMatrix4 framePrefix "Transform" cameraTransform
             outputNMatrix3 framePrefix "Intrinsics" cameraIntrinsics
+            needsBoundingBox <- true
             Threading.ThreadPool.QueueUserWorkItem(fun _ ->
                 let frame = SdfFrame (IO.Path.Combine(outputDir, framePrefix + "_Depth.pixelbuffer"))
                 project.AddFrame frame

@@ -442,7 +442,7 @@ type ProjectViewController (project : Project) =
 
     member this.UpdatePointCloud () =
         Threading.Tasks.Parallel.ForEach (project.DepthPaths, fun fi ->
-            let f = project.GetFrame fi
+            let f = project.GetFrameWithDepthPath fi
             SCNTransaction.Begin ()
             SCNTransaction.AnimationDuration <- 1.0
             if f.Visible then

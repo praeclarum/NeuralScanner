@@ -33,7 +33,8 @@ type Project (settings : ProjectSettings, projectDir : string) =
     let settingsPath = Path.Combine (projectDir, "Settings.xml")
     let saveMonitor = obj ()
 
-    let mutable captureFiles = Directory.GetFiles (projectDir, "*_Depth.pixelbuffer")
+    let mutable depthPaths = Directory.GetFiles (projectDir, "*_Depth.pixelbuffer")
+    let mutable imagePaths = Directory.GetFiles (projectDir, "*_Image.jpg")
 
     let frames = System.Collections.Concurrent.ConcurrentDictionary<string, SdfFrame> ()
 
@@ -45,7 +46,8 @@ type Project (settings : ProjectSettings, projectDir : string) =
 
     member this.ProjectDirectory = projectDir
     member this.CaptureDirectory = projectDir
-    member this.DepthPaths = captureFiles
+    member this.DepthPaths = depthPaths
+    member this.ImagePaths = imagePaths
 
     member this.Settings = settings
 
@@ -56,7 +58,7 @@ type Project (settings : ProjectSettings, projectDir : string) =
         if n.Length > 0 then n.Replace("*", "_").Replace("?", "_").Replace("!", "_").Replace("/", "_")
         else "Untitled"
 
-    member this.NumCaptures = captureFiles.Length
+    member this.NumCaptures = imagePaths.Length
     member this.NewFrameIndex = this.NumCaptures
 
     member this.SaveSolidMesh (mesh : SdfKit.Mesh, meshId : string) : string =
@@ -147,27 +149,29 @@ type Project (settings : ProjectSettings, projectDir : string) =
     member this.SetChanged (property : string) =
         changed.Trigger property
 
-    member this.GetFrame (depthPath : string) : SdfFrame =
+    member this.GetFrameWithDepthPath (depthPath : string) : SdfFrame =
         frames.GetOrAdd (depthPath, fun x -> SdfFrame x)
 
     member this.GetFrames () : SdfFrame[] =
         this.DepthPaths
-        |> Array.map this.GetFrame
+        |> Array.map this.GetFrameWithDepthPath
         |> Array.sortBy (fun x -> x.FrameIndex)
 
     member this.GetVisibleFrames () : SdfFrame[] =
         this.DepthPaths
-        |> Array.map this.GetFrame
+        |> Array.map this.GetFrameWithDepthPath
         |> Array.filter (fun x -> x.Visible)
         |> Array.sortBy (fun x -> x.FrameIndex)
 
     member this.AddFrame (frame : SdfFrame) =
-        captureFiles <- Array.append captureFiles [| frame.DepthPath |]
+        depthPaths <- Array.append depthPaths [| frame.DepthPath |]
+        imagePaths <- Array.append imagePaths [| frame.ImagePath |]
         frames.[frame.DepthPath] <- frame
         changed.Trigger "NumCaptures"
 
     member this.UpdateCaptures () =
-        captureFiles <- Directory.GetFiles (projectDir, "*_Depth.pixelbuffer")
+        depthPaths <- Directory.GetFiles (projectDir, "*_Depth.pixelbuffer")
+        imagePaths <- Directory.GetFiles (projectDir, "*_Image.jpg")
         changed.Trigger "NumCaptures"
 
     member this.Save () =
@@ -181,6 +185,31 @@ type Project (settings : ProjectSettings, projectDir : string) =
                 //let newConfig = Config.Read<ProjectSettings> (settingsPath)
                 ()))
         |> ignore
+
+    member this.AutoSetBounds () =
+        let frames = this.GetFrames ()
+        if frames.Length > 0 then
+            let mutable sum = Vector3.Zero
+            let mutable num = 0
+            let mutable fmin = frames.[0].MinPoint
+            let mutable fmax = frames.[0].MaxPoint
+            for f in frames do
+                sum <- sum + f.CenterPoint
+                num <- num + 1
+                fmin <- Vector3.Min (fmin, f.MinPoint)
+                fmax <- Vector3.Max (fmax, f.MaxPoint)
+            let center =
+                if num > 0 then sum / float32 num
+                else sum
+            let r = Vector3.Min(fmax - center, center - fmin)
+            let bmin = Vector3.Max(center - r, fmin)
+            let bmax = Vector3.Min(center + r, fmax)
+            let bcenter = (bmax + bmin) * 0.5f
+            let br = bmax - bcenter
+            this.Settings.ClipTranslation <- bcenter
+            this.Settings.ClipScale <- br
+            this.SetModified "Settings.Clip"
+            ()
 
 
 and ProjectSettings (name : string,
