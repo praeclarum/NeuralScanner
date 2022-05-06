@@ -37,6 +37,8 @@ type ProjectsViewController () =
                     | _ -> ()
             | _ -> ()
             split.SetViewController (detailVC, UISplitViewControllerColumn.Secondary)
+            split.HideColumn (UISplitViewControllerColumn.Primary)
+            split.ShowColumn (UISplitViewControllerColumn.Secondary)
 
     override this.GetCell (tableView, indexPath) =
         let cell =

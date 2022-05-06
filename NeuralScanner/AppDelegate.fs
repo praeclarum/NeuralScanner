@@ -14,27 +14,15 @@ type AppDelegate() =
     override this.FinishedLaunching(_, _) =
         this.Window <- new UIWindow(UIScreen.MainScreen.Bounds)
 
-        let homeVC = new UIViewController(Title = "Home")
-        let renderVC = new RenderViewController(Title = "Render")
-        let trainVC = new TrainViewController()
         let projectsVC = new ProjectsViewController ()
-        let projectsNC = new UINavigationController (projectsVC)
 
         let gettingStartedVC = new GettingStartedViewController ()
         let gettingStartedNC = new UINavigationController (gettingStartedVC)
 
-        //let tabs = new UITabBarController ()
-        //let tabVCs : UIViewController[] =
-        //    [|
-        //        new UINavigationController (trainVC)
-        //        //new UINavigationController (homeVC)
-        //        new UINavigationController (renderVC)
-        //    |]
-        //tabs.SetViewControllers (tabVCs, false)
-
         let split = new UISplitViewController(UISplitViewControllerStyle.DoubleColumn)
+        split.PreferredSplitBehavior <- UISplitViewControllerSplitBehavior.Tile
         split.PrimaryBackgroundStyle <- UISplitViewControllerBackgroundStyle.Sidebar
-        split.SetViewController(projectsNC, UISplitViewControllerColumn.Primary)
+        split.SetViewController(projectsVC, UISplitViewControllerColumn.Primary)
         split.SetViewController(gettingStartedNC, UISplitViewControllerColumn.Secondary)
 
         this.Window.RootViewController <- split

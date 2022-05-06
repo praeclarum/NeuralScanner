@@ -86,7 +86,7 @@ type ProjectViewController (project : Project) =
         pauseTrainButton.SetImage(UIImage.GetSystemImage "pause.circle", UIControlState.Normal)
         resetTrainButton.SetTitle("Reset Training", UIControlState.Normal)
         resetTrainButton.SetImage(UIImage.GetSystemImage "arrow.counterclockwise.circle", UIControlState.Normal)
-    let trainButtons = new UIStackView (Axis = UILayoutConstraintAxis.Horizontal, Spacing = nfloat 44.0)
+    let trainButtons = new UIStackView (Axis = UILayoutConstraintAxis.Horizontal, Distribution = UIStackViewDistribution.FillProportionally)
     do trainButtons.AddArrangedSubview trainButton
     do trainButtons.AddArrangedSubview pauseTrainButton
     do trainButtons.AddArrangedSubview resetTrainButton
@@ -113,10 +113,10 @@ type ProjectViewController (project : Project) =
         viewButtons.AddArrangedSubview viewBoundsButton
         viewButtons.AddArrangedSubview viewPointsButton
         viewButtons.AddArrangedSubview viewRoughMeshButton
-        viewButtons.AddArrangedSubview viewInsidePointsButton
-        viewButtons.AddArrangedSubview viewOutsidePointsButton
-        viewButtons.AddArrangedSubview viewFreespacePointsButton
-        viewButtons.AddArrangedSubview viewVoxelsButton
+        //viewButtons.AddArrangedSubview viewInsidePointsButton
+        //viewButtons.AddArrangedSubview viewOutsidePointsButton
+        //viewButtons.AddArrangedSubview viewFreespacePointsButton
+        //viewButtons.AddArrangedSubview viewVoxelsButton
         viewButtons.AddArrangedSubview viewSolidMeshButton
 
     let scene = SCNScene.Create()
@@ -230,7 +230,7 @@ type ProjectViewController (project : Project) =
         view.AddSubview nameField
         view.AddSubview trainButtons
         view.AddSubview capturePanel
-        view.AddSubview learningRateSlider
+        //view.AddSubview learningRateSlider
         view.AddSubview previewProgress
         view.AddSubview previewButton
         view.AddSubview previewResolutionSlider
@@ -251,11 +251,12 @@ type ProjectViewController (project : Project) =
             lossView.LayoutRight == view.LayoutRight
             lossView.LayoutBottom == view.LayoutBottom
             lossView.LayoutTop == view.SafeAreaLayoutGuide.LayoutBottom - 88.0
-            trainButtons.LayoutCenterX == lossView.LayoutCenterX
+            trainButtons.LayoutLeft == view.SafeAreaLayoutGuide.LayoutLeft
+            trainButtons.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight
             trainButtons.LayoutBottom == lossView.LayoutTop
-            learningRateSlider.LayoutCenterX == lossView.LayoutCenterX
-            learningRateSlider.LayoutBottom == trainButtons.LayoutTop
-            learningRateSlider.LayoutWidth == lossView.LayoutWidth * 0.5
+            //learningRateSlider.LayoutCenterX == lossView.LayoutCenterX
+            //learningRateSlider.LayoutBottom == trainButtons.LayoutTop
+            //learningRateSlider.LayoutWidth == lossView.LayoutWidth * 0.5
 
             capturePanel.LayoutBaseline == nameField.LayoutBaseline
             capturePanel.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11
