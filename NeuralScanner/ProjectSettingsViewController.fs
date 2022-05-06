@@ -26,11 +26,20 @@ type ProjectSettingsViewController (project : Project) =
     let posY = new ValueSliderTableCell ("Center Y", "0.000", -moveSize, moveSize, id, id)
     let posZ = new ValueSliderTableCell ("Center Z", "0.000", -moveSize, moveSize, id, id)
     let rotY = new ValueSliderTableCell ("Rotation", "0.000", -180.0f, 180.0f, id, id)
+    let name = new TextFieldTableCell ("Name", Value = project.Settings.Name)
 
     override this.ViewDidLoad () =
         base.ViewDidLoad ()
         this.SetSections
             [|
+                {
+                    Header = ""
+                    Footer = ""
+                    Rows =
+                        [|
+                            name
+                        |]
+                }
                 {
                     Header = ""
                     Footer = "The output mesh will be constructed by sampling the neural network with the given number of voxels."
@@ -71,6 +80,7 @@ type ProjectSettingsViewController (project : Project) =
 
     override this.UpdateUI () =
         base.UpdateUI ()
+        name.TextField.UpdateValue (project.Settings.Name)
         resolution.ValueSlider.UpdateValue (project.Settings.Resolution)
         posX.ValueSlider.UpdateValue (project.Settings.ClipTranslation.X)
         posY.ValueSlider.UpdateValue (project.Settings.ClipTranslation.Y)
@@ -85,6 +95,9 @@ type ProjectSettingsViewController (project : Project) =
 
     override this.SubscribeUI () =
         [|
+            name.TextField.ValueChanged.Subscribe (fun v ->
+                project.Settings.Name <- v
+                project.SetModified ("Name"))
             resolution.ValueSlider.ValueChanged.Subscribe (fun v ->
                 project.Settings.Resolution <- v
                 project.SetModified ("Settings.Resolution"))

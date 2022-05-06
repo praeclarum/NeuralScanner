@@ -50,6 +50,12 @@ type LayoutRef =
     static member ( <== ) (a, c : float) =
         let b = LayoutRef.FromConstant (nfloat c)
         LayoutRef.CreateConstraint a b NSLayoutRelation.LessThanOrEqual
+    static member ( >== ) (a, c : int) =
+        let b = LayoutRef.FromConstant (nfloat (float c))
+        LayoutRef.CreateConstraint a b NSLayoutRelation.GreaterThanOrEqual
+    static member ( <== ) (a, c : int) =
+        let b = LayoutRef.FromConstant (nfloat (float c))
+        LayoutRef.CreateConstraint a b NSLayoutRelation.LessThanOrEqual
     static member ( @@ ) (r, p) = { r with P = p }
     static member ( @@ ) (r, p : float) = { r with P = float32 p }
     static member ( @@ ) (r, p : nfloat) = { r with P = float32 p }

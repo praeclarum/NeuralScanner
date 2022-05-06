@@ -17,7 +17,7 @@ type IStoppable =
 type Control () =
     inherit UIView (TranslatesAutoresizingMaskIntoConstraints = false, BackgroundColor = UIColor.Clear)
     
-type ControlTableCell (control : UIView, height : float) =
+type ControlTableCell (control : UIView) =
     inherit UITableViewCell (UITableViewCellStyle.Default, "C")
     do
         let view = base.ContentView
@@ -32,6 +32,68 @@ type ControlTableCell (control : UIView, height : float) =
                 control.LayoutBottom == view.LayoutMarginsGuide.LayoutBottom
             |]
     member this.Control = control
+
+type TextField (label : string) =
+    inherit Control ()
+
+    let changed = Event<string> ()
+
+    let labelFont = UIFont.SystemFontOfSize (UIFont.LabelFontSize)
+    let valueFont = UIFont.BoldSystemFontOfSize (UIFont.LabelFontSize)
+
+    let labelView = new UILabel(Text = label,
+                                Font = labelFont,
+                                TranslatesAutoresizingMaskIntoConstraints = false)
+    let valueView = new UITextField(Text = "",
+                                    ShouldReturn = (fun x -> x.ResignFirstResponder () |> ignore; false),
+                                    Font = valueFont,
+                                    TextColor = base.TintColor,
+                                    BackgroundColor = UIColor.Clear,
+                                    TranslatesAutoresizingMaskIntoConstraints = false)
+
+    do
+        base.AddSubview (labelView)
+        base.AddSubview (valueView)
+        let view = labelView.Superview
+        
+        view.AddConstraints
+            [|
+                view.LayoutHeight >== 44
+                labelView.LayoutLeading == view.SafeAreaLayoutGuide.LayoutLeading
+                labelView.LayoutCenterY == view.SafeAreaLayoutGuide.LayoutCenterY
+                valueView.LayoutLeading == labelView.LayoutTrailing + 6
+                valueView.LayoutBaseline == labelView.LayoutBaseline
+                valueView.LayoutWidth >== view.LayoutWidth * 0.5
+            |]
+
+    let mutable userInteracting = false
+
+    let subs =
+        [|
+            valueView.EditingChanged.Subscribe (fun _ ->
+                userInteracting <- true
+                try
+                    changed.Trigger valueView.Text
+                with ex ->
+                    printfn "SLIDER INPUT ERROR: %O" ex
+                userInteracting <- false)
+        |]
+
+    member this.ValueChanged = changed.Publish
+
+    member this.Value with get () = valueView.Text
+                      and set v = valueView.Text <- v
+
+    member this.UserInteracting = userInteracting
+
+    member this.UpdateValue (v) =
+        if not this.UserInteracting then
+            this.Value <- v
+
+type TextFieldTableCell (label : string) =
+    inherit ControlTableCell (new TextField (label))
+    member this.TextField = this.Control :?> TextField
+    member this.Value with get () = this.TextField.Value and set v = this.TextField.Value <- v
 
 type ToggleButton (title : string) =
     inherit UIButton (TranslatesAutoresizingMaskIntoConstraints = false)
@@ -135,7 +197,7 @@ type ValueSlider (label : string, valueFormat : string,
 type ValueSliderTableCell (label : string, valueFormat : string,
                            minSliderValue : float32, maxSliderValue,
                            sliderToValue : float32 -> float32, valueToSlider : float32 -> float32) =
-    inherit ControlTableCell (new ValueSlider (label, valueFormat, minSliderValue, maxSliderValue, sliderToValue, valueToSlider), 44.0)
+    inherit ControlTableCell (new ValueSlider (label, valueFormat, minSliderValue, maxSliderValue, sliderToValue, valueToSlider))
     member this.ValueSlider = this.Control :?> ValueSlider
 
 

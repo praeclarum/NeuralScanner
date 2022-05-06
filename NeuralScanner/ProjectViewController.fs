@@ -90,7 +90,7 @@ type ProjectViewController (project : Project) =
     do trainButtons.AddArrangedSubview trainButton
     do trainButtons.AddArrangedSubview pauseTrainButton
     do trainButtons.AddArrangedSubview resetTrainButton
-    let nameField = new UITextField (Font = UIFont.PreferredTitle1, Placeholder = "Name", Text = project.Name)
+    //let nameField = new UITextField (Font = UIFont.PreferredTitle1, Placeholder = "Name", Text = project.Name)
 
     let previewProgress = new UIProgressView (Alpha = nfloat 0.0f, TranslatesAutoresizingMaskIntoConstraints = false)
 
@@ -220,14 +220,10 @@ type ProjectViewController (project : Project) =
 
         lossView.TranslatesAutoresizingMaskIntoConstraints <- false
 
-        nameField.TextAlignment <- UITextAlignment.Center
-        nameField.TranslatesAutoresizingMaskIntoConstraints <- false
-
         trainButtons.TranslatesAutoresizingMaskIntoConstraints <- false
 
         view.AddSubview (sceneView)
         view.AddSubview (lossView)
-        view.AddSubview nameField
         view.AddSubview trainButtons
         view.AddSubview capturePanel
         //view.AddSubview learningRateSlider
@@ -240,11 +236,8 @@ type ProjectViewController (project : Project) =
         view.AddSubview arMeshButton
 
         [|
-            nameField.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop
-            nameField.LayoutLeading == view.SafeAreaLayoutGuide.LayoutLeading
-            nameField.LayoutTrailing == view.SafeAreaLayoutGuide.LayoutTrailing
-            previewResolutionSlider.LayoutTop == nameField.LayoutBottom + 11
-            previewResolutionSlider.LayoutCenterX == nameField.LayoutCenterX
+            previewResolutionSlider.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop + 11
+            previewResolutionSlider.LayoutLeft == view.SafeAreaLayoutGuide.LayoutLeft
             previewResolutionSlider.LayoutWidth == view.LayoutWidth * 0.5
 
             lossView.LayoutLeft == view.LayoutLeft
@@ -258,7 +251,7 @@ type ProjectViewController (project : Project) =
             //learningRateSlider.LayoutBottom == trainButtons.LayoutTop
             //learningRateSlider.LayoutWidth == lossView.LayoutWidth * 0.5
 
-            capturePanel.LayoutBaseline == nameField.LayoutBaseline
+            capturePanel.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop + 11
             capturePanel.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11
             viewButtons.LayoutTop == capturePanel.LayoutBottom + 11
             viewButtons.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11
@@ -282,6 +275,7 @@ type ProjectViewController (project : Project) =
             if project.NumCaptures = 0 then "Object not scanned"
             else sprintf "%d depth scans" project.NumCaptures
         captureButton.Hidden <- project.NumCaptures > 0
+        this.Title <- project.Settings.Name
         if trainingService.IsTraining then
             trainButton.Enabled <- false
             resetTrainButton.Enabled <- false
@@ -372,7 +366,6 @@ type ProjectViewController (project : Project) =
         Threading.ThreadPool.QueueUserWorkItem (fun _ -> this.UpdatePointCloud ()) |> ignore
 
     override this.SubscribeUI () =
-        nameField.ShouldReturn <- fun x -> x.ResignFirstResponder() |> ignore; false
         [|
             project.Changed.Subscribe (fun _ ->
                 this.BeginInvokeOnMainThread (fun _ ->
@@ -392,9 +385,6 @@ type ProjectViewController (project : Project) =
             previewResolutionSlider.ValueChanged.Subscribe (fun r ->
                 project.Settings.Resolution <- r
                 project.SetModified "Settings.Resolution")
-
-            nameField.EditingChanged.Subscribe (fun _ ->
-                project.Name <- nameField.Text)
 
             captureButton.TouchUpInside.Subscribe(fun _ -> this.HandleCapture())
             trainButton.TouchUpInside.Subscribe (fun _ ->
