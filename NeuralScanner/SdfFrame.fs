@@ -140,43 +140,51 @@ type SdfFrame (depthPath : string) =
             printfn "ERROR: %O" ex
 
     let width, height, depths =
-        let f = File.OpenRead (depthPath)
-        let r = new BinaryReader (f)
-        let magic = r.ReadInt32 ()
-        let width = r.ReadInt32 ()
-        let height = r.ReadInt32 ()
-        let stride = r.ReadInt32 ()
-        let dataSize = r.ReadInt32 ()
-        let pixelFormat = r.ReadInt32 ()
-        let len = width * height
-        assert(len = dataSize/4)
-        let depths : float32[] = Array.zeroCreate len
-        let span = MemoryMarshal.AsBytes(depths.AsSpan())
-        let n = f.Read (span)
-        assert(n = dataSize)
-        r.Close()
-        width, height, depths
+        try
+            let f = File.OpenRead (depthPath)
+            let r = new BinaryReader (f)
+            let magic = r.ReadInt32 ()
+            let width = r.ReadInt32 ()
+            let height = r.ReadInt32 ()
+            let stride = r.ReadInt32 ()
+            let dataSize = r.ReadInt32 ()
+            let pixelFormat = r.ReadInt32 ()
+            let len = width * height
+            assert(len = dataSize/4)
+            let depths : float32[] = Array.zeroCreate len
+            let span = MemoryMarshal.AsBytes(depths.AsSpan())
+            let n = f.Read (span)
+            assert(n = dataSize)
+            r.Close()
+            width, height, depths
+        with
+        | :? IO.FileNotFoundException ->
+            320, 240, Array.zeroCreate (320 * 240)
     let index x y = y * width + x
 
     let minConfidence = 2uy
     let confidences =
-        let path = depthPath.Replace("_Depth", "_DepthConfidence")
-        let f = File.OpenRead (path)
-        let r = new BinaryReader (f)
-        let magic = r.ReadInt32 ()
-        let width = r.ReadInt32 ()
-        let height = r.ReadInt32 ()
-        let stride = r.ReadInt32 ()
-        let dataSize = r.ReadInt32 ()
-        let pixelFormat = r.ReadInt32 ()
-        let len = width * height
-        assert(len = dataSize)
-        let confs : byte[] = Array.zeroCreate len
-        let span = MemoryMarshal.AsBytes(confs.AsSpan())
-        let n = f.Read (span)
-        assert(n = dataSize)
-        r.Close()
-        confs
+        try
+            let path = depthPath.Replace("_Depth", "_DepthConfidence")
+            let f = File.OpenRead (path)
+            let r = new BinaryReader (f)
+            let magic = r.ReadInt32 ()
+            let width = r.ReadInt32 ()
+            let height = r.ReadInt32 ()
+            let stride = r.ReadInt32 ()
+            let dataSize = r.ReadInt32 ()
+            let pixelFormat = r.ReadInt32 ()
+            let len = width * height
+            assert(len = dataSize)
+            let confs : byte[] = Array.zeroCreate len
+            let span = MemoryMarshal.AsBytes(confs.AsSpan())
+            let n = f.Read (span)
+            assert(n = dataSize)
+            r.Close()
+            confs
+        with
+        | :? IO.FileNotFoundException ->
+            Array.zeroCreate (width * height)
 
     let colorBytes : byte[] =
         let image = UIImage.FromFile(imagePath)

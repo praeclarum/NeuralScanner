@@ -15,7 +15,7 @@ type CaptureViewController (project : Project) =
 
     let captureButton =
         let b = UIButton.FromType UIButtonType.RoundedRect
-        b.SetTitle("Scanner", UIControlState.Normal)
+        b.SetTitle("Scan", UIControlState.Normal)
         b.Enabled <- false
         b.Alpha <- nfloat 0.5
         b
@@ -195,15 +195,17 @@ type CaptureViewController (project : Project) =
             //printfn "PROJECTION %A" cameraProjection
             //printfn "TRANSFORM  %A" cameraTransform
             //printfn "POSITION   %A" cameraPosition
-            let depthPath = outputPixelBuffer framePrefix "Depth" sceneDepth.DepthMap
-            let _ = outputPixelBuffer framePrefix "DepthConfidence" sceneDepth.ConfidenceMap
+            if sceneDepth <> null then
+                let depthPath = outputPixelBuffer framePrefix "Depth" sceneDepth.DepthMap
+                let _ = outputPixelBuffer framePrefix "DepthConfidence" sceneDepth.ConfidenceMap
+                ()
             let _ = outputPixelBuffer framePrefix "Image" capturedImage
             outputSize framePrefix "Resolution" cameraResolution
             outputNMatrix4 framePrefix "Projection" cameraProjection
             outputNMatrix4 framePrefix "Transform" cameraTransform
             outputNMatrix3 framePrefix "Intrinsics" cameraIntrinsics
             Threading.ThreadPool.QueueUserWorkItem(fun _ ->
-                let frame = SdfFrame (depthPath)
+                let frame = SdfFrame (IO.Path.Combine(outputDir, framePrefix + "_Depth.pixelbuffer"))
                 project.AddFrame frame
                 let n = frame.CreatePointNode (UIColor.SystemGreen)
                 n.Opacity <- nfloat 0.5

@@ -236,9 +236,12 @@ type ProjectViewController (project : Project) =
         view.AddSubview arMeshButton
 
         [|
-            previewResolutionSlider.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop + 11
-            previewResolutionSlider.LayoutLeft == view.SafeAreaLayoutGuide.LayoutLeft
-            previewResolutionSlider.LayoutWidth == view.LayoutWidth * 0.5
+            previewResolutionSlider.LayoutCenterX == lossView.LayoutCenterX
+            previewResolutionSlider.LayoutBottom == trainButtons.LayoutTop - 11
+            previewResolutionSlider.LayoutWidth == lossView.LayoutWidth * 0.75
+            //learningRateSlider.LayoutCenterX == lossView.LayoutCenterX
+            //learningRateSlider.LayoutBottom == trainButtons.LayoutTop
+            //learningRateSlider.LayoutWidth == lossView.LayoutWidth * 0.5
 
             lossView.LayoutLeft == view.LayoutLeft
             lossView.LayoutRight == view.LayoutRight
@@ -247,17 +250,15 @@ type ProjectViewController (project : Project) =
             trainButtons.LayoutLeft == view.SafeAreaLayoutGuide.LayoutLeft
             trainButtons.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight
             trainButtons.LayoutBottom == lossView.LayoutTop
-            //learningRateSlider.LayoutCenterX == lossView.LayoutCenterX
-            //learningRateSlider.LayoutBottom == trainButtons.LayoutTop
-            //learningRateSlider.LayoutWidth == lossView.LayoutWidth * 0.5
 
             capturePanel.LayoutTop == view.SafeAreaLayoutGuide.LayoutTop + 11
             capturePanel.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11
             viewButtons.LayoutTop == capturePanel.LayoutBottom + 11
             viewButtons.LayoutRight == view.SafeAreaLayoutGuide.LayoutRight - 11
-            previewButton.LayoutTop == viewButtons.LayoutBottom + 33
-            previewButton.LayoutCenterX == viewButtons.LayoutCenterX
-            previewProgress.LayoutTop == previewButton.LayoutBottom
+
+            previewButton.LayoutBottom == previewResolutionSlider.LayoutTop - 11
+            previewButton.LayoutCenterX == view.LayoutCenterX
+            previewProgress.LayoutTop == previewButton.LayoutTop - 6
             previewProgress.LayoutHeight == 4
             previewProgress.LayoutLeft == viewButtons.LayoutLeft
             previewProgress.LayoutRight == viewButtons.LayoutRight

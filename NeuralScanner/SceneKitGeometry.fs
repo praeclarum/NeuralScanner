@@ -64,24 +64,32 @@ module SceneKitGeometry =
         geometry
 
     let createColoredPointCloudGeometry (colors : Vector3[]) (normals : Vector3[]) (pointCoords : SCNVector3[]) : SCNGeometry =
-        if pointCoords.Length = 0 then
-            failwithf "No points provided"
-        let source = SCNGeometrySource.FromVertices(pointCoords)
-        let nsource = SCNGeometrySource.FromNormals(normals |> Array.map (fun x -> SCNVector3(x.X, x.Y, x.Z)))
-        let csource =
-            let elemStream = new IO.MemoryStream ()
-            let elemWriter = new IO.BinaryWriter (elemStream)
-            for i in 0..(colors.Length - 1) do
-                let c = colors.[i]
-                elemWriter.Write c.X
-                elemWriter.Write c.Y
-                elemWriter.Write c.Z
-            elemWriter.Flush ()
-            elemStream.Position <- 0L
-            let data = NSData.FromStream (elemStream)
-            SCNGeometrySource.FromData(data, SCNGeometrySourceSemantics.Color, nint colors.Length, true, nint 3, nint 4, nint 0, nint (3*4))
-        let geometry = createPointCloudGeometryWithSources [|source;nsource;csource|] pointCoords
-        let material = geometry.FirstMaterial
+        let geometry =
+            if pointCoords.Length = 0 then
+                SCNGeometry.Create()
+            else
+                let source = SCNGeometrySource.FromVertices(pointCoords)
+                let nsource = SCNGeometrySource.FromNormals(normals |> Array.map (fun x -> SCNVector3(x.X, x.Y, x.Z)))
+                let csource =
+                    let elemStream = new IO.MemoryStream ()
+                    let elemWriter = new IO.BinaryWriter (elemStream)
+                    for i in 0..(colors.Length - 1) do
+                        let c = colors.[i]
+                        elemWriter.Write c.X
+                        elemWriter.Write c.Y
+                        elemWriter.Write c.Z
+                    elemWriter.Flush ()
+                    elemStream.Position <- 0L
+                    let data = NSData.FromStream (elemStream)
+                    SCNGeometrySource.FromData(data, SCNGeometrySourceSemantics.Color, nint colors.Length, true, nint 3, nint 4, nint 0, nint (3*4))
+                createPointCloudGeometryWithSources [|source;nsource;csource|] pointCoords
+        let material =
+            match geometry.FirstMaterial with
+            | null ->
+                let m = SCNMaterial.Create ()
+                geometry.Materials <- [|m|]
+                m
+            | m -> m
         //material.Diffuse.ContentColor <- UIColor.White
         material.LightingModelName <- SCNLightingModel.Constant
         geometry
