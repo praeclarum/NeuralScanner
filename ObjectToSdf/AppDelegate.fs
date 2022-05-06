@@ -13,11 +13,33 @@ type O2S () =
         |> Array.collect (fun d ->
             Directory.GetFiles(d, "*.zip", SearchOption.AllDirectories))
 
+    let numCells = 128
+    let cellSize = 2.0 / float numCells
+    let numPoints = 10
+
     let processObjBytes (name : string) (stream : Stream) =
         let md5 = Security.Cryptography.MD5.Create()
-        let hash = Convert.ToBase64String(md5.ComputeHash(stream))
+        let hash = md5.ComputeHash(stream)
+        let hashSum = Seq.sum (hash |> Seq.map int)
         stream.Position <- 0L
+
+        let random = Random(hashSum)
         let mesh = StandardMeshReader.ReadMesh(stream, "obj")
+        let bounds = mesh.GetBounds ()
+        MeshTransforms.ConvertZUpToYUp (mesh)
+        let ybounds = mesh.GetBounds ()
+        MeshTransforms.Translate (mesh, -ybounds.Center)
+        let cbounds = mesh.GetBounds ()
+        let scale = 0.9 + 0.1 * random.NextDouble ()
+        MeshTransforms.Scale (mesh, scale/cbounds.Extents.x, scale/cbounds.Extents.y, scale/cbounds.Extents.z)
+        let sbounds = mesh.GetBounds ()
+        let sdf = new MeshSignedDistanceGrid(mesh, cellSize)
+        sdf.Compute()
+        let iso = DenseGridTrilinearImplicit(sdf.Grid, Vector3d(sdf.GridOrigin), cellSize)
+        for i in 0..(numPoints - 1) do
+            let mutable p = Vector3d (random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0)
+            let d = iso.Value (&p)
+            ()
         ()
 
     let mutable numFilesProc = 0
@@ -25,6 +47,7 @@ type O2S () =
     let processFile (zipPath : string) =
         //printfn "ZIP: %s" zipPath
         let n = Threading.Interlocked.Increment(&numFilesProc)
+        let name = (Path.GetFileName(zipPath))
         use zs = File.OpenRead zipPath
         use z = new Compression.ZipArchive (zs)
         z.Entries
@@ -35,8 +58,8 @@ type O2S () =
             s.CopyTo d
             let progress = 100.0 * (float numFilesProc / float files.Length)
             d.Position <- 0L
-            processObjBytes x.FullName d
-            printfn "[%.1f] %s/%s (%d)" progress (Path.GetFileName(zipPath)) x.FullName d.Length
+            processObjBytes name d
+            printfn "[%.1f] %s/%s (%d)" progress name x.FullName d.Length
             ())
         ()
 
