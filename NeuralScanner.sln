@@ -11,6 +11,8 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "MetalTensors", "..\MetalTen
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeJunk", "NativeJunk\NativeJunk.csproj", "{DF02C00B-68D4-4337-BC83-60A5CB5CD2B7}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ObjectToSdf", "ObjectToSdf\ObjectToSdf.fsproj", "{CC64B058-4DDD-4ED1-B291-7C6D647D6627}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|iPhoneSimulator = Debug|iPhoneSimulator
@@ -43,6 +45,14 @@ Global
 		{DF02C00B-68D4-4337-BC83-60A5CB5CD2B7}.Release|iPhoneSimulator.Build.0 = Release|Any CPU
 		{DF02C00B-68D4-4337-BC83-60A5CB5CD2B7}.Debug|iPhone.ActiveCfg = Debug|Any CPU
 		{DF02C00B-68D4-4337-BC83-60A5CB5CD2B7}.Debug|iPhone.Build.0 = Debug|Any CPU
+		{CC64B058-4DDD-4ED1-B291-7C6D647D6627}.Debug|iPhoneSimulator.ActiveCfg = Debug|Any CPU
+		{CC64B058-4DDD-4ED1-B291-7C6D647D6627}.Debug|iPhoneSimulator.Build.0 = Debug|Any CPU
+		{CC64B058-4DDD-4ED1-B291-7C6D647D6627}.Release|iPhone.ActiveCfg = Release|Any CPU
+		{CC64B058-4DDD-4ED1-B291-7C6D647D6627}.Release|iPhone.Build.0 = Release|Any CPU
+		{CC64B058-4DDD-4ED1-B291-7C6D647D6627}.Release|iPhoneSimulator.ActiveCfg = Release|Any CPU
+		{CC64B058-4DDD-4ED1-B291-7C6D647D6627}.Release|iPhoneSimulator.Build.0 = Release|Any CPU
+		{CC64B058-4DDD-4ED1-B291-7C6D647D6627}.Debug|iPhone.ActiveCfg = Debug|Any CPU
+		{CC64B058-4DDD-4ED1-B291-7C6D647D6627}.Debug|iPhone.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
