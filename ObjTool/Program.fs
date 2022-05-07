@@ -45,7 +45,10 @@ let processObj (path: string) =
     if File.Exists(path+".bak") then
         File.Delete(path+".bak")
     File.Move(path, path + ".bak")
-    let result = StandardMeshWriter.WriteMesh(path, mesh, WriteOptions.Defaults)
+    let mutable options = WriteOptions.Defaults
+    options.bPerVertexNormals <- false
+    options.bCombineMeshes <- false
+    let result = StandardMeshWriter.WriteMesh(path, mesh, options)
     if result.code = IOCode.Ok then
         printfn "Success"
         File.Delete(path + ".bak")
