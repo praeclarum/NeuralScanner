@@ -8,7 +8,7 @@ open g3
 type O2S () =
 
     let inputDirs = [|"/Volumes/nn/Data/GoogleScannedObjects" |]
-    let outputDir = "/Volumes/nn/Data/datasets/sdfs"
+    let outputDir = "/Volumes/nn/Data/datasets/sdfs2"
 
     do if Directory.Exists outputDir |> not then Directory.CreateDirectory outputDir |> ignore
 
@@ -19,7 +19,7 @@ type O2S () =
 
     let numCells = 512
     let cellSize = 2.0 / float numCells
-    let numPoints = 200_000
+    let numPoints = 250_000
 
     let processObjBytes (name : string) (stream : Stream) =
         let md5 = Security.Cryptography.MD5.Create()
@@ -27,6 +27,7 @@ type O2S () =
         let hashSum = Seq.sum (hash |> Seq.map int)
         let hashString = String.Join ("", hash |> Seq.map (fun x -> x.ToString("x2")))
         let outputPath = Path.Combine (outputDir, (hashString + ".sdf"))
+        let meshPath = Path.Combine (outputDir, (hashString + ".obj"))
         if File.Exists outputPath then
             ()
         else
@@ -42,21 +43,31 @@ type O2S () =
             let scale = 0.9 + 0.1 * random.NextDouble ()
             MeshTransforms.Scale (mesh, scale/cbounds.Extents.x, scale/cbounds.Extents.y, scale/cbounds.Extents.z)
             let sbounds = mesh.GetBounds ()
+            StandardMeshWriter.WriteMesh(meshPath, mesh, WriteOptions.Defaults) |> ignore
             let sdf = new MeshSignedDistanceGrid(mesh, cellSize)
             sdf.ComputeSigns <- true
             sdf.UseParallel <- true
             sdf.Compute()
             let iso = DenseGridTrilinearImplicit(sdf.Grid, Vector3d(sdf.GridOrigin), cellSize)
-            iso.Outside <- 2.0
+            iso.Outside <- 3.0
+            if false then
+                let c = new MarchingCubes()
+                c.Implicit <- iso
+                c.Bounds <- mesh.CachedBounds
+                c.CubeSize <- c.Bounds.MaxDim / 128.0
+                c.Bounds.Expand(3.0 * c.CubeSize)                
+                c.Generate()
+                StandardMeshWriter.WriteMesh(meshPath, c.Mesh, WriteOptions.Defaults) |> ignore
             let tempPath =
                 let p = Path.GetTempFileName ()
                 use s = new FileStream(p, FileMode.Create, FileAccess.Write)
                 use w = new BinaryWriter (s)
                 for i in 0..(numPoints - 1) do
-                    let wantSurface = (i % 2) = 0
+                    let wantSurface = random.Next(100) < 90
+                    let neg = (i % 2) = 0
                     let mutable p = Vector3d (random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0)
                     let mutable d = iso.Value (&p) |> float32
-                    while Single.IsInfinity d || Single.IsNaN d || (wantSurface && abs d > 0.1f) do
+                    while Single.IsInfinity d || Single.IsNaN d || (wantSurface && abs d > 0.3f) || (abs d > 2.0f) || not (neg && d < 0.0f || not neg && d >= 0.0f) do
                         p <- Vector3d (random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0)
                         d <- iso.Value (&p) |> float32
                     w.Write(float32 p.x)
