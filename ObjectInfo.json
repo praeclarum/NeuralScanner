@@ -1,23 +1,22 @@
 {
     "Categories": [
         {
-            "CategoryId": "Cars",
-            "EnglishTitle": "Cars",
-            "Description": "Cool cars",
+            "CategoryId": "Shoes",
+            "EnglishTitle": "Shoes",
+            "Description": "Fancy Shoes",
             "Tags": [
-                "car",
-                "vehicle"
+                "shoe",
+                "clothing"
             ]
         },
         {
-            "CategoryId": "Gliders",
-            "EnglishTitle": "Gliders",
-            "Description": "Fun glider toys",
+            "CategoryId": "Spaceships",
+            "EnglishTitle": "Spaceships",
+            "Description": "Spaceships from the future",
             "Tags": [
-                "glider",
-                "vehicle",
-                "toy",
-                "airplane"
+                "space",
+                "ship",
+                "vehicle"
             ]
         }
     ]
