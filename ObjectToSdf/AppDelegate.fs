@@ -63,11 +63,10 @@ type O2S () =
                 use s = new FileStream(p, FileMode.Create, FileAccess.Write)
                 use w = new BinaryWriter (s)
                 for i in 0..(numPoints - 1) do
-                    let wantSurface = random.Next(100) < 90
-                    let neg = (i % 2) = 0
+                    let wantSurface = random.Next(100) < 75
                     let mutable p = Vector3d (random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0)
                     let mutable d = iso.Value (&p) |> float32
-                    while Single.IsInfinity d || Single.IsNaN d || (wantSurface && abs d > 0.3f) || (abs d > 2.0f) || not (neg && d < 0.0f || not neg && d >= 0.0f) do
+                    while Single.IsInfinity d || Single.IsNaN d || (wantSurface && abs d > 2.0f) do
                         p <- Vector3d (random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0)
                         d <- iso.Value (&p) |> float32
                     w.Write(float32 p.x)
