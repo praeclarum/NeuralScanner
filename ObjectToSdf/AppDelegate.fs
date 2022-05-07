@@ -25,6 +25,7 @@ type O2S () =
         let hashString = String.Join ("", hash |> Seq.map (fun x -> x.ToString("x2")))
         let meshPath = Path.Combine (outputDir, sprintf "%s.obj" hashString)
         let outputPath = Path.Combine (outputDir, sprintf "%s.sdf" hashString)
+        let voxelsPath = Path.Combine (outputDir, sprintf "%s_Voxels.obj" hashString)
 
         if (File.Exists meshPath && File.Exists outputPath) |> not then
 
@@ -45,14 +46,14 @@ type O2S () =
             sdf.Compute()
             let iso = DenseGridTrilinearImplicit(sdf.Grid, Vector3d(sdf.GridOrigin), cellSize)
             iso.Outside <- 3.0
-            //if false then
-            //    let c = new MarchingCubes()
-            //    c.Implicit <- iso
-            //    c.Bounds <- mesh.CachedBounds
-            //    c.CubeSize <- c.Bounds.MaxDim / 128.0
-            //    c.Bounds.Expand(3.0 * c.CubeSize)                
-            //    c.Generate()
-            //    StandardMeshWriter.WriteMesh(meshPath, c.Mesh, WriteOptions.Defaults) |> ignore
+            if true then
+                let c = new MarchingCubes()
+                c.Implicit <- iso
+                c.Bounds <- mesh.CachedBounds
+                c.CubeSize <- c.Bounds.MaxDim / 128.0
+                c.Bounds.Expand(3.0 * c.CubeSize)                
+                c.Generate()
+                StandardMeshWriter.WriteMesh(voxelsPath, c.Mesh, WriteOptions.Defaults) |> ignore
             let tempPath =
                 let p = Path.GetTempFileName ()
                 use s = new FileStream(p, FileMode.Create, FileAccess.Write)
@@ -104,7 +105,7 @@ type O2S () =
 
     member this.Run () =
         let trainingDataDir = objectInfo.TrainingDataDirectory
-        for cat in objectInfo.Categories do
+        for cat in objectInfo.Categories |> Seq.filter (fun x -> true || x.CategoryId = "Spaceships") do
             let inDir = Path.Combine(trainingDataDir, cat.CategoryId)
             let outDir = Path.Combine(outputBaseDir, cat.CategoryId)
             Directory.CreateDirectory (outDir) |> ignore
