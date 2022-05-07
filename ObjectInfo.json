@@ -1,4 +1,5 @@
 {
+    "TrainingDataDirectory": "/Users/fak/Dropbox/Projects/NeuralScanner/TrainingData",
     "Categories": [
         {
             "CategoryId": "Shoes",

@@ -3,6 +3,7 @@
 type ObjectInfo =
     {
         Categories : ObjectCategory[]
+        TrainingDataDirectory : string
     }
 
     static member Load () : ObjectInfo =
