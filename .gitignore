@@ -1,6 +1,8 @@
 .ionide
 Data
 NativeJunk/build
+/TrainingData
+/IncomingData
 
 # globs
 Makefile.in

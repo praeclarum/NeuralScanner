@@ -1,0 +1,24 @@
+{
+    "Categories": [
+        {
+            "CategoryId": "Cars",
+            "EnglishTitle": "Cars",
+            "Description": "Cool cars",
+            "Tags": [
+                "car",
+                "vehicle"
+            ]
+        },
+        {
+            "CategoryId": "Gliders",
+            "EnglishTitle": "Gliders",
+            "Description": "Fun glider toys",
+            "Tags": [
+                "glider",
+                "vehicle",
+                "toy",
+                "airplane"
+            ]
+        }
+    ]
+}
