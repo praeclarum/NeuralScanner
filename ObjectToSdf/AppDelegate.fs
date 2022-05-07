@@ -8,7 +8,7 @@ open g3
 type O2S () =
 
     let inputDirs = [|"/Volumes/nn/Data/GoogleScannedObjects" |]
-    let outputDir = "/Volumes/nn/Data/datasets/sdfs2"
+    let outputDir = "/Volumes/nn/Data/datasets/sdfs4"
 
     do if Directory.Exists outputDir |> not then Directory.CreateDirectory outputDir |> ignore
 
@@ -26,19 +26,19 @@ type O2S () =
         let hash = md5.ComputeHash(stream)
         let hashSum = Seq.sum (hash |> Seq.map int)
         let hashString = String.Join ("", hash |> Seq.map (fun x -> x.ToString("x2")))
-        let outputPath = Path.Combine (outputDir, (hashString + ".sdf"))
-        let meshPath = Path.Combine (outputDir, (hashString + ".obj"))
-        if File.Exists outputPath then
-            ()
-        else
-            stream.Position <- 0L
+        stream.Position <- 0L
 
-            let random = Random(hashSum)
-            let mesh = StandardMeshReader.ReadMesh(stream, "obj")
-            let bounds = mesh.GetBounds ()
-            MeshTransforms.ConvertZUpToYUp (mesh)
-            let ybounds = mesh.GetBounds ()
-            MeshTransforms.Translate (mesh, -ybounds.Center)
+        let random = Random(hashSum)
+        let mesh = StandardMeshReader.ReadMesh(stream, "obj")
+        let bounds = mesh.GetBounds ()
+        MeshTransforms.ConvertZUpToYUp (mesh)
+        let ybounds = mesh.GetBounds ()
+        MeshTransforms.Translate (mesh, -ybounds.Center)
+        for ri in 0..3 do
+            let meshPath = Path.Combine (outputDir, sprintf "%s_%d.obj" hashString ri)
+            let outputPath = Path.Combine (outputDir, sprintf "%s_%d.sdf" hashString ri)
+            let mesh = DMesh3(mesh)
+            MeshTransforms.Rotate(mesh, Vector3d.Zero, Quaterniond.AxisAngleD(Vector3d.AxisY, random.NextDouble()*360.0))
             let cbounds = mesh.GetBounds ()
             let scale = 0.9 + 0.1 * random.NextDouble ()
             MeshTransforms.Scale (mesh, scale/cbounds.Extents.x, scale/cbounds.Extents.y, scale/cbounds.Extents.z)
