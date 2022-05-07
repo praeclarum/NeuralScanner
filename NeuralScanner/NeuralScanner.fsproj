@@ -100,6 +100,9 @@
     <Reference Include="FSharp.Core">
       <HintPath>..\packages\FSharp.Core.5.0.2\lib\netstandard2.0\FSharp.Core.dll</HintPath>
     </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.13.0.1\lib\netstandard2.0\Newtonsoft.Json.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Resources\" />
@@ -118,6 +121,7 @@
     <None Include="Entitlements.plist" />
     <InterfaceDefinition Include="Main.storyboard" />
     <Compile Include="SceneKitGeometry.fs" />
+    <Compile Include="ObjectInfo.fs" />
     <Compile Include="SdfFrame.fs" />
     <Compile Include="Project.fs" />
     <Compile Include="SdfDataSource.fs" />
@@ -138,14 +142,17 @@
     <Compile Include="Main.fs" />
     <BundleResource Include="Resources\SDF.mlmodel" />
     <None Include="packages.config" />
+    <BundleResource Include="..\ObjectInfo.json">
+      <Link>Resources\ObjectInfo.json</Link>
+    </BundleResource>
+    <ProjectReference Include="..\NativeJunk\NativeJunk.csproj">
+      <Project>{DF02C00B-68D4-4337-BC83-60A5CB5CD2B7}</Project>
+      <Name>NativeJunk</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\MetalTensors\MetalTensors.iOS\MetalTensors.iOS.csproj">
       <Project>{06BAB14A-A97E-44D4-BABC-ED0EBB5771AD}</Project>
       <Name>MetalTensors.iOS</Name>
       <ReferenceSourceTarget>ProjectReference</ReferenceSourceTarget>
-    </ProjectReference>
-    <ProjectReference Include="..\NativeJunk\NativeJunk.csproj">
-      <Project>{DF02C00B-68D4-4337-BC83-60A5CB5CD2B7}</Project>
-      <Name>NativeJunk</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.iOS.FSharp.targets" />

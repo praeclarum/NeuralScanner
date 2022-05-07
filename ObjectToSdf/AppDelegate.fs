@@ -4,8 +4,11 @@ open Foundation
 open AppKit
 open System.IO
 open g3
+open NeuralScanner
 
 type O2S () =
+
+    let objectInfo = ObjectInfo.Load()
 
     let inputDirs = [|"/Volumes/nn/Data/GoogleScannedObjects" |]
     let outputDir = "/Volumes/nn/Data/datasets/sdfs4"

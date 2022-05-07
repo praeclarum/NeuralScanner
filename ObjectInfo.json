@@ -2,7 +2,7 @@
     "Categories": [
         {
             "CategoryId": "Shoes",
-            "EnglishTitle": "Shoes",
+            "Title": "Shoes",
             "Description": "Fancy Shoes",
             "Tags": [
                 "shoe",
@@ -11,7 +11,7 @@
         },
         {
             "CategoryId": "Spaceships",
-            "EnglishTitle": "Spaceships",
+            "Title": "Spaceships",
             "Description": "Spaceships from the future",
             "Tags": [
                 "space",
