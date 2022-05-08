@@ -10,13 +10,13 @@ type O2S () =
 
     let objectInfo = ObjectInfo.Load()
 
-    let outputBaseDir = "/Volumes/nn/Data/datasets/sdfs5"
+    let outputBaseDir = "/Volumes/nn/Data/datasets/sdfs6"
 
     do if Directory.Exists outputBaseDir |> not then Directory.CreateDirectory outputBaseDir |> ignore
 
     let numCells = 512
     let cellSize = 2.0 / float numCells
-    let numPoints = 250_000
+    let numPoints = 1_000_000
 
     let processObjBytes (stream : Stream) outputDir =
         let md5 = Security.Cryptography.MD5.Create()
@@ -27,7 +27,7 @@ type O2S () =
         let outputPath = Path.Combine (outputDir, sprintf "%s.sdf" hashString)
         let voxelsPath = Path.Combine (outputDir, sprintf "%s_Voxels.obj" hashString)
 
-        if (File.Exists meshPath && File.Exists outputPath) |> not then
+        if true || (File.Exists meshPath && File.Exists outputPath) |> not then
 
             let random = Random(hashSum)
             stream.Position <- 0L
@@ -35,7 +35,8 @@ type O2S () =
             let ybounds = mesh.GetBounds ()
             MeshTransforms.Translate (mesh, -ybounds.Center)
             let cbounds = mesh.GetBounds ()
-            let scale = 0.97 / (cbounds.MaxDim / 2.0)
+            let maxExtent = 0.97
+            let scale = maxExtent / (cbounds.MaxDim / 2.0)
             MeshTransforms.Scale (mesh, scale, scale, scale)
             let sbounds = mesh.GetBounds ()
             StandardMeshWriter.WriteMesh(meshPath, mesh, WriteOptions.Defaults) |> ignore
@@ -44,9 +45,9 @@ type O2S () =
             sdf.ComputeSigns <- true
             sdf.UseParallel <- true
             sdf.Compute()
-            let iso = DenseGridTrilinearImplicit(sdf.Grid, Vector3d(sdf.GridOrigin), cellSize)
-            iso.Outside <- 3.0
-            if true then
+            let iso = DenseGridTrilinearImplicit(sdf.Grid, Vector3d(sdf.GridOrigin), float sdf.CellSize)
+            iso.Outside <- 2.0
+            if false then
                 let c = new MarchingCubes()
                 c.Implicit <- iso
                 c.Bounds <- mesh.CachedBounds
@@ -61,8 +62,9 @@ type O2S () =
                 for i in 0..(numPoints - 1) do
                     let wantSurface = random.Next(100) < 75
                     let mutable p = Vector3d (random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0)
+                    p <- 0.99*Vector3d.One
                     let mutable d = iso.Value (&p) |> float32
-                    while Single.IsInfinity d || Single.IsNaN d || (wantSurface && abs d > 2.0f) do
+                    while Single.IsInfinity d || Single.IsNaN d || (wantSurface && abs d > 1.0f) do
                         p <- Vector3d (random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0)
                         d <- iso.Value (&p) |> float32
                     w.Write(float32 p.x)
