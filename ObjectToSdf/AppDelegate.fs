@@ -106,7 +106,7 @@ type O2S () =
 
     member this.Run () =
         let trainingDataDir = objectInfo.TrainingDataDirectory
-        for cat in objectInfo.Categories |> Seq.filter (fun x -> false || x.CategoryId = "Spaceships") do
+        for cat in objectInfo.Categories |> Seq.filter (fun x -> true || x.CategoryId = "Spaceships") do
             let inDir = Path.Combine(trainingDataDir, cat.CategoryId)
             let outDir = Path.Combine(outputBaseDir, cat.CategoryId)
             Directory.CreateDirectory (outDir) |> ignore
