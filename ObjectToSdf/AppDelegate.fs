@@ -10,7 +10,7 @@ type O2S () =
 
     let objectInfo = ObjectInfo.Load()
 
-    let outputBaseDir = "/Volumes/nn/Data/datasets/sdfs6"
+    let outputBaseDir = "/Volumes/nn/Data/datasets/sdfs7"
 
     do if Directory.Exists outputBaseDir |> not then Directory.CreateDirectory outputBaseDir |> ignore
 
@@ -27,7 +27,7 @@ type O2S () =
         let outputPath = Path.Combine (outputDir, sprintf "%s.sdf" hashString)
         let voxelsPath = Path.Combine (outputDir, sprintf "%s_Voxels.obj" hashString)
 
-        if true || (File.Exists meshPath && File.Exists outputPath) |> not then
+        if false || (File.Exists meshPath && File.Exists outputPath) |> not then
 
             let random = Random(hashSum)
             stream.Position <- 0L
@@ -62,7 +62,6 @@ type O2S () =
                 for i in 0..(numPoints - 1) do
                     let wantSurface = random.Next(100) < 75
                     let mutable p = Vector3d (random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0)
-                    p <- 0.99*Vector3d.One
                     let mutable d = iso.Value (&p) |> float32
                     while Single.IsInfinity d || Single.IsNaN d || (wantSurface && abs d > 1.0f) do
                         p <- Vector3d (random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0, random.NextDouble () * 2.0 - 1.0)
@@ -107,13 +106,13 @@ type O2S () =
 
     member this.Run () =
         let trainingDataDir = objectInfo.TrainingDataDirectory
-        for cat in objectInfo.Categories |> Seq.filter (fun x -> true || x.CategoryId = "Spaceships") do
+        for cat in objectInfo.Categories |> Seq.filter (fun x -> false || x.CategoryId = "Spaceships") do
             let inDir = Path.Combine(trainingDataDir, cat.CategoryId)
             let outDir = Path.Combine(outputBaseDir, cat.CategoryId)
             Directory.CreateDirectory (outDir) |> ignore
             let files = Directory.GetFiles(inDir, "*.obj", SearchOption.AllDirectories)
             printfn "%d FILES" files.Length
-            let options = Threading.Tasks.ParallelOptions(MaxDegreeOfParallelism = 3)
+            let options = Threading.Tasks.ParallelOptions(MaxDegreeOfParallelism = 5)
             Threading.Tasks.Parallel.ForEach (files, options, processFile outDir) |> ignore
             ()
 
